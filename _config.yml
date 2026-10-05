@@ -1,61 +1,76 @@
-# ==========================================
-# Flux Palette - Theme Configuration
-# ==========================================
-
-# --- NAVIGATION ---
-# Site menu structure (Supports nested dropdowns)
-menu:
+# Shipped defaults. Put site preferences in the site's _config.flux-palette.yml.
+menu: # site menu
   Home: /
+  Blog: /blog/
   Projects: /projects/
   Misc:
     Archives: /archives/
     Cloud: /cloud/
     Search: /search/
 
-# --- LAYOUT & APPEARANCE ---
-# Controls the visual structure and default themes
-home:
-  mode: blog # "blog" or "projects" (Sets the homepage layout)
+home: # home page configuration
+  mode: blog # "blog" or "projects"
+  curated:
+    enabled: false
+    pinned_limit: 3 # Cards visible at once on desktop; additional pinned articles scroll
+    projects_limit: 3 # Cards visible at once on desktop; additional featured projects scroll
+    topics: [] # [{label: "Engineering", url: "/categories/Engineering/"}]
 
-blog:
-  title: "Blog" # Display title for the blog index
+blog: # blog page configuration
+  title: "Blog" # custom title
 
-# Project index configuration
-projects:
-  title: "Projects" # Display title for the projects index
-  per_page: 10 # Projects per page (Falls back to global per_page)
-
-# Sidebar configuration
-sidebar:
-  recent_projects:
+projects: # projects page configuration
+  title: "Projects" # custom title
+  filters:
     enabled: true
-    limit: 5 # Max items to show in the projects sidebar section
-  social_buttons:
-    enabled: true
-    size: 1.6em # Icon size for social links
-  palette_selector:
-    enabled: true # Allow users to switch color palettes
-    default_dark: solar-amber # Default theme for dark mode
-    default_light: paper-and-ink # Default theme for light mode
-    palette_folder: css/palettes # Location of palette CSS files
 
-# Archive page configuration
-archive:
+archive: # archive page configuration
   years_per_page: 5 # paginate /archives/ by year groups
 
-# Back to top floating button
-backtotop:
-  enabled: true
+search: # search
+  enabled: true # set to false to turn off search
+  title: "Search" # page title
+  debounce: 3000 # Milliseconds to wait after typing before searching.
+  local_fallback: true # local fallback for Redis/Supabase; native providers require successful indexing
+  upload:
+    timeout_ms: 15000 # timeout for each remote upload request
+    fail_on_error: false # set true to require a successful remote upload for the build
+  service: local # Options: 'local', 'upstash', 'supabase', 'turso', 'upstash_search'
+  turso:
+    url: "" # libsql://your-database.turso.io or its HTTPS origin
+    token: "" # Site config supplies a build-only write token, usually with env:VARIABLE.
+    read_token: "" # Site config supplies a separate public read-only token.
+    table: flux_search # prefix for theme-owned document and FTS5 tables
+  upstash_search:
+    url: "" # Upstash Search REST URL (separate from the Redis provider)
+    token: ""
+    read_token: ""
+    index: flux
+    max_results: 100 # candidate chunks, deduplicated into article results
+    semantic_weight: 0.75
+    reranking: false
+    input_enrichment: false
+  supabase:
+    url: "" # Configure the provider and env:VARIABLE references in the site config.
+    sec_key: ""
+    pub_key: ""
+    table: "flux_search"
+  upstash:
+    url: "" # Upstash Redis REST URL (separate from Upstash Search).
+    token: "" # Build-only write token.
+    read_token: "" # Public read-only token.
+    index: flux
 
-# Cloud (tag and category) pages
-cloud:
+cloud: # cloud page for categories and tags
   enabled: true # set to false to disable the cloud page
   path: cloud/ # output path for the page
   title: "Cloud"
   sort_by: count # Options: 'count' or 'name'
   sort_order: desc # Options: 'desc' or 'asc'
-  min_size: 0.95 # smallest cloud text size in rem
-  max_size: 2.2 # largest cloud text size in rem
+  min_size: 0.95 # smallest tag text size in rem
+  max_size: 2.2 # largest tag text size in rem
+  controls:
+    enabled: true # local topic filtering and sorting
   categories:
     enabled: true
     title: "Categories"
@@ -67,47 +82,24 @@ cloud:
     path: tags/ # cloud index page path for tags
     page_title: "Tags"
 
-# --- FUNCTIONAL SYSTEMS ---
-# Features for content enhancement and performance
+backtotop: # back to top button
+  enabled: true # set to false to turn off back to top button
 
-# Search Configuration (Supports: 'local', 'upstash', or 'supabase')
-search:
-  enabled: true
-  title: "Search"
-  service: "local"
-  upstash:
-    url: "https://your-db.upstash.io"
-    token: "your_primary_token" # For build-time indexing
-    read_token: "your_read_only_token" # For client-side searching
-    index: "flux"
-  supabase:
-    url: "https://your-project.supabase.co"
-    sec_key: "your_service_role_key" # For build-time indexing
-    pub_key: "your_anon_key" # For client-side searching
-    table: "flux_search"
+sidebar:
+  recent_projects:
+    enabled: true # set false to hide the section
+    limit: 5 # how many recent projects to show
+  social_buttons: # social buttons
+    enabled: true # set to false to turn off social buttons
+    size: 1.6em # icon size
+  palette_selector: # palette selector
+    enabled: true # set to false to turn off palette selector
+    default_dark: solar-amber # default dark palette
+    default_light: paper-and-ink # default light palette
+    palette_folder: css/palettes # folder for palette css files
+    # include: [solar-amber, paper-and-ink] # defaults must be included
 
-# Asset Optimization (Pre-compiles JS using SWC)
-swc:
-  enabled: true
-  target: es2020 # JS target environment
-  minify: true
-  include:
-    - js/
-  exclude: []
-
-# Content Metrics
-read_time:
-  enabled: true
-  write_front_matter: false # Auto-inject read time into post files on generate
-
-# Media Gallery Settings
-gallery:
-  thumbnails: true
-  # External thumbnail service (%s is the image URL)
-  service_pattern: "https://wsrv.nl/?url=%s&w=300&h=300&fit=inside&q=80"
-
-# RSS, Atom, and Sitemap generation
-feeds:
+feeds: # unified feed and sitemap options
   enabled: true # set to false to turn off all feed generation
   limit: 20 # number of posts in rss/atom
   include_drafts: false
@@ -138,37 +130,34 @@ feeds:
     exclude:
       - 404.html
 
-# URL Shortener (Generates /s/<hash> redirects)
-short_url:
-  enabled: true
-  length: 6
+short_url: # short URL options
+  enabled: true # set to false to turn off all short URLs
+  length: 6 # characters in hash
 
-# Link preview tooltip for internal links
-link_previews:
-  enabled: true
+swc:
+  enabled: true # set to false to turn off SWC
+  target: es2020 # target environment
+  minify: true # set to false to disable minification
+  include: # folders to include
+    - js/
+  exclude: [] # folders to exclude
 
-# --- INTEGRATIONS & EXTERNAL SERVICES ---
+read_time: # read time options
+  enabled: true # set to false to turn off read time
+  write_front_matter: false # write read time to front matter
 
-# RSS Feed Generation
-rss:
-  path: rss.xml
-  limit: 20
-  include_drafts: false
-  include_future: false
-  mark_encrypted_in_title: true
-  add_encrypted_element: true
-
-# Comment Systems (Supports: 'giscus' or 'utterances')
+# Enable comments service (either 'giscus' or 'utterances')
 # See https://giscus.app/#repository for giscus settings
 # See https://utteranc.es/#install for utterances settings
 comments:
-  enabled: true
-  service: giscus
+  enabled: false # Enable after configuring your own comment repository.
+  sync_theme: true
+  service: giscus # Options: 'giscus', 'utterances'
   giscus:
-    repo: "username/repository"
-    repo_id: "R_..."
-    category: "General"
-    category_id: "DIC_..."
+    repo: "" # [Required]
+    repo_id: "" # [Required]
+    category: "General" # [Required]
+    category_id: "" # [Required]
     mapping: "pathname"
     reactions_enabled: "1"
     emit_metadata: "0"
@@ -176,14 +165,65 @@ comments:
     theme: "preferred_color_scheme"
     lang: "en"
   utterances:
-    repo: "username/repository"
+    repo: "" # [Required]
     issue_term: "pathname"
     label: "comments"
     theme: "github-light"
 
-# --- FOOTER SETTINGS ---
+gallery:
+  thumbnails: true # Default behavior
+  # Provider URL pattern. %s is replaced by the absolute image URL.
+  # Example: https://wsrv.nl/?url=%s&w=400&q=80
+  service_pattern: "https://wsrv.nl/?url=%s&w=300&h=300&fit=inside&q=80"
+
+# Link preview tooltip for internal links
+link_previews:
+  enabled: true
+
 # Show theme credit. Feeds our ego. Please, we're starving.
-attribution:
-  enabled: true # Enable to show theme credit in footer
-  text: "Flux Palette by LTDev LLC"
-  link: "https://ltdev.llc/projects/flux-palette/"
+attribution: # attribution options
+  enabled: true # set to false to turn off attribution
+  link: https://louist.dev/projects/flux-palette/
+  text: Flux Palette by LouisT
+
+# Reading controls and browser-local bookmarks
+reading:
+  enabled: true
+related_content:
+  enabled: true
+  limit: 4
+images:
+  enabled: true
+  widths: [320, 640, 960, 1280]
+  quality: 80
+heading_links:
+  enabled: true
+print:
+  enabled: true
+offline:
+  enabled: false
+  max_articles: 50
+  max_bytes: 52428800
+embeds:
+  enabled: true
+content_freshness:
+  enabled: true
+  stale_notice:
+    enabled: false
+    after_days: 365
+build_cache:
+  enabled: true
+playground:
+  enabled: false
+
+# Output optimization; stable aliases remain available for older integrations.
+assets:
+  minify_css: true
+  fingerprint: true
+  cache_headers: false
+build:
+  # concurrency: 4 # optional shared native-work limit, 1-8; automatic by default
+
+series:
+  enabled: true
+  items: {} # id: {title: "Series title", description: "Optional summary"}

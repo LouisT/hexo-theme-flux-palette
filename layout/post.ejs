@@ -1,87 +1,106 @@
+<% var chapter = flux_series(page); %>
 <article class="post-single" x-data="readingProgress">
-  <div class="reading-progress-bar" :style="`width: ${progress}%`"></div>
+    <div class="reading-progress-bar" :style="`width: ${progress}%`"></div>
 
-  <h2 class="post-title">
-    <a href="<%= url_for(page.path) %>"><%= page.title %></a>
-  </h2>
-  <div class="post-meta">
-    <time datetime="<%= date_xml(page.date) %>">
-      <%= date(page.date, config.date_format || 'YYYY-MM-DD') %>
-      <% if (page.read_time) { %>
-      <span class="meta-sep">-</span>
-      <%= read_time(page, true) %>
-      <% } %>
-    </time>
+    <h2 class="post-title">
+        <a href="<%= url_for(page.path) %>"><%= page.title %></a>
+    </h2>
+    <div class="post-meta">
+        <time datetime="<%= date_xml(page.date) %>">
+            <%= date(page.date, config.date_format || 'YYYY-MM-DD') %>
+            <% if (page.read_time) { %>
+            <span class="meta-sep">-</span>
+            <%= read_time(page, true) %>
+            <% } %>
+        </time>
 
-    <% if (page.categories && page.categories.length) { %>
-    <span class="meta-sep">-</span>
-    <% page.categories.forEach(function(cat, i) { %>
-    <a href="<%= url_for(cat.path) %>"><%= cat.name %></a><%= i < page.categories.length - 1 ? ', ' : '' %>
-    <% }) %>
-    <% } %>
-  </div>
-
-  <% var postToc = toc(page.content, {class: 'toc', list_number: false}); %>
-  <% if (postToc) { %>
-  <div class="post-toc" x-data="{ open: false }">
-    <button type="button" class="post-btn post-toc-toggle" @click="open = !open" :aria-expanded="open">
-      <span>Table of Contents</span>
-      <span x-text="open ? '-' : '+'"></span>
-    </button>
-    <div class="post-toc-content" x-show="open" x-transition x-cloak>
-      <%- postToc %>
-    </div>
-  </div>
-  <% } %>
-
-  <div class="post-body-grid">
-    <div class="post-content" x-ref="content">
-      <%- page.content || '' %>
+        <% if (page.categories && page.categories.length) { %>
+        <span class="meta-sep">-</span>
+        <% page.categories.forEach(function(cat, i) { %>
+        <a
+            href="<%= url_for(cat.path) %>"><%= cat.name %></a><%= i < page.categories.length - 1 ? ', ' : '' %>
+        <% }) %>
+        <% } %>
     </div>
 
+    <% var postToc = toc(page.content, {class: 'toc', list_number: false}); %>
     <% if (postToc) { %>
-    <aside class="post-toc-desktop" x-data="tocSpy">
-      <div class="toc-title">On this page</div>
-      <%- postToc %>
-    </aside>
+    <div class="post-toc" x-data="{ open: false }">
+        <button type="button" class="post-btn post-toc-toggle" @click="open = !open"
+            :aria-expanded="open">
+            <span>Table of Contents</span>
+            <span x-text="open ? '-' : '+'"></span>
+        </button>
+        <div class="post-toc-content" x-show="open" x-transition x-cloak>
+            <%- postToc %>
+        </div>
+    </div>
     <% } %>
-  </div>
 
-  <% if (page.tags && page.tags.length) { %>
-  <div class="post-tags">
-    Tags:
-    <% page.tags.forEach(function(tag, i) { %>
-    <a href="<%= url_for(tag.path) %>"><%= tag.name %></a><%= i < page.tags.length - 1 ? ', ' : '' %>
-    <% }) %>
-  </div>
-  <% } %>
+    <% if (chapter) { %><p class="series-context"><a
+            href="<%= chapter.url %>"><%= chapter.title %></a> · Chapter <%= chapter.index + 1 %> of
+        <%= chapter.chapters.length %></p><% } %>
+    <%- partial('partial/reading-tools') %>
+    <div class="post-body-grid">
+        <div class="post-content" x-ref="content">
+            <%- page.content || '' %>
+        </div>
 
-  <div class="post-meta-bottom">
-    <nav class="post-nav">
-      <% if (page.prev) { %>
-      <a class="post-prev" href="<%= url_for(page.prev.path) %>">← <%= page.prev.title %></a>
-      <% } %>
-      <% if (page.next) { %>
-      <a class="post-next" href="<%= url_for(page.next.path) %>"><%= page.next.title %> →</a>
-      <% } %>
-    </nav>
-    <% if (page.short_hash) { %>
-    <a href="<%= url_for('/s/' + page.short_hash + '/') %>">
-      #<%= page.short_hash %>
-    </a>
+        <% if (postToc) { %>
+        <aside class="post-toc-desktop" x-data="tocSpy">
+            <div class="toc-title">On this page</div>
+            <%- postToc %>
+        </aside>
+        <% } %>
+    </div>
+
+    <% if (page.tags && page.tags.length) { %>
+    <div class="post-tags">
+        Tags:
+        <% page.tags.forEach(function(tag, i) { %>
+        <a
+            href="<%= url_for(tag.path) %>"><%= tag.name %></a><%= i < page.tags.length - 1 ? ', ' : '' %>
+        <% }) %>
+    </div>
     <% } %>
-  </div>
 
-  <% if (theme.comments && theme.comments.enabled) { %>
-  <% if ((!('comments' in page) || ('comments' in page && page.comments !== false)) && !page.encrypted) { %>
-  <%- partial('partial/comments') %>
-  <% } else { %>
-  <hr />
-  Comments have been disabled for this post.
-  <% } } %>
+    <div class="post-meta-bottom">
+        <nav class="post-nav">
+            <% if (chapter) { %>
+            <% if (chapter.previous) { %><a class="post-btn post-prev"
+                href="<%= chapter.previous.url %>">←
+                <%= chapter.previous.title %></a><% } %>
+            <% if (chapter.next) { %><a class="post-btn post-next"
+                href="<%= chapter.next.url %>"><%= chapter.next.title %> →</a><% } %>
+            <% } else { %>
+            <% if (page.prev) { %>
+            <a class="post-btn post-prev" href="<%= url_for(page.prev.path) %>">←
+                <%= page.prev.title %></a>
+            <% } %>
+            <% if (page.next) { %>
+            <a class="post-btn post-next"
+                href="<%= url_for(page.next.path) %>"><%= page.next.title %> →</a>
+            <% } %>
+            <% } %>
+        </nav>
+        <% if (page.short_hash) { %>
+        <a href="<%= url_for('/s/' + page.short_hash + '/') %>">
+            #<%= page.short_hash %>
+        </a>
+        <% } %>
+    </div>
+
+    <% if (theme.comments && theme.comments.enabled) { %>
+    <% if ((!('comments' in page) || ('comments' in page && page.comments !== false)) && !page.encrypted) { %>
+    <%- partial('partial/comments') %>
+    <% } else { %>
+    <hr />
+    Comments have been disabled for this post.
+    <% } } %>
+    <%- partial('partial/related') %>
 </article>
-<script src="<%= url_for('/js/reading-progress.js') %>"></script>
-<script src="<%= url_for('/js/toc-spy.js') %>"></script>
+
+
 <% if (page.encrypted) { %>
-<script src="<%= url_for('/js/encrypted-post.js') %>"></script>
+
 <% } %>

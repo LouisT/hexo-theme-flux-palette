@@ -1,9 +1,53 @@
 {
-  "name": "hexo-theme-flux-palette",
-  "version": "1.0.0",
-  "description": "A minimal Hexo theme with a focus on color palettes and custom scripts.",
-  "main": "index.js",
-  "author": "LTDev LLC",
-  "license": "MIT",
-  "dependencies": {}
+    "name": "hexo-theme-flux-palette",
+    "version": "1.1.0",
+    "description": "A minimal Hexo theme with a focus on color palettes and custom scripts.",
+    "main": "index.js",
+    "author": "LouisT",
+    "license": "MIT",
+    "scripts": {
+        "format": "npm run format:js && npm run format:css && npm run format:ejs",
+        "format:check": "npm run format:js:check && npm run format:css:check && npm run format:ejs:check",
+        "format:js": "prettier --write \"**/*.{js,cjs,mjs}\"",
+        "format:js:check": "prettier --check \"**/*.{js,cjs,mjs}\"",
+        "format:css": "biome format --write source/css",
+        "format:css:check": "biome format source/css",
+        "format:ejs": "node tools/format-ejs.cjs --write",
+        "format:ejs:check": "node tools/format-ejs.cjs --check",
+        "check": "node tools/check-site.cjs"
+    },
+    "engines": {
+        "node": ">=20.19"
+    },
+    "dependencies": {
+        "@alpinejs/collapse": "3.17.4",
+        "alpinejs": "3.17.4",
+        "cheerio": "1.2.0",
+        "esbuild": "0.28.2",
+        "hexo-front-matter": "^5.0.0",
+        "hexo-renderer-ejs": "2.0.0",
+        "hexo-renderer-marked": "7.0.1",
+        "hexo-util": "4.0.0",
+        "katex": "0.19.0",
+        "lightningcss": "1.33.0",
+        "mermaid": "12.1.0",
+        "moment-timezone": "0.6.5",
+        "sharp": "0.35.5"
+    },
+    "devDependencies": {
+        "@biomejs/biome": "2.5.15",
+        "hexo": "^8.1.2",
+        "js-beautify": "2.0.3",
+        "playwright": "1.63.0",
+        "prettier": "3.9.9"
+    },
+    "optionalDependencies": {
+        "@swc/core": "1.16.13"
+    },
+    "allowScripts": {
+        "esbuild": true,
+        "hexo-util": true,
+        "@swc/core": true,
+        "fsevents": true
+    }
 }

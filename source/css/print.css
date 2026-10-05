@@ -1,0 +1,126 @@
+@page {
+    margin: 18mm;
+}
+html,
+body,
+body.site {
+    height: auto !important;
+    overflow: visible !important;
+    background: white !important;
+    color: black !important;
+    font: 11pt / 1.5 serif;
+}
+body.site * {
+    background: transparent !important;
+    color: black !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+}
+.site-body,
+.site-main,
+.post-body-grid {
+    display: block !important;
+    max-width: none !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+.site-header,
+.site-sidebar,
+.site-footer,
+.article-tools,
+.reading-toolbar,
+.card-bookmark,
+.offline-controls,
+.reading-progress-bar,
+.post-toc,
+.post-toc-desktop,
+.post-nav,
+.post-meta-bottom,
+.post-tags,
+.related-content,
+.comments-section,
+.back-to-top,
+.lightbox-container,
+.heading-link-feedback,
+.heading-link-fallback,
+.heading-link-legacy,
+.code-actions,
+.skip-link {
+    display: none !important;
+}
+.post-content,
+.page-content {
+    max-width: none !important;
+    font: inherit !important;
+}
+.post-content *,
+.page-content * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+    color: black !important;
+}
+h1,
+h2,
+h3,
+h4 {
+    break-after: avoid;
+}
+img {
+    max-width: 100% !important;
+    break-inside: avoid;
+}
+pre,
+code,
+.highlight pre {
+    white-space: pre-wrap !important;
+    overflow-wrap: anywhere !important;
+}
+.tab-panel,
+.accordion-content,
+.tabs-panels {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+}
+.tabs-nav,
+.accordion-header {
+    display: none !important;
+}
+.post-content a[href^="http"]::after,
+.page-content a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 9pt;
+    overflow-wrap: anywhere;
+}
+.encrypted-form,
+.encrypted-post-content,
+.lock-again {
+    display: none !important;
+}
+.protected-print-notice {
+    display: block !important;
+}
+.deferred-embed {
+    border: 1px solid #888;
+}
+.deferred-embed button,
+.deferred-embed iframe {
+    display: none !important;
+}
+/* Print every curated card without clipping the scrollable sections. */
+@media print {
+    .curated-controls {
+        display: none !important;
+    }
+    .curated-grid {
+        grid-auto-flow: row;
+        grid-auto-columns: auto;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        overflow: visible;
+        scroll-snap-type: none;
+    }
+    .curated-grid .post-card {
+        break-inside: avoid;
+    }
+}

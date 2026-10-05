@@ -4,12 +4,12 @@ const crypto = require('crypto'),
     path = require('path'),
     fm = require('hexo-front-matter');
 
-// Generate a short hash from a string
+// Derive a stable eight-character hash for a short URL
 function makeShortHash(input) {
     return crypto.createHash('sha256').update(String(input)).digest('hex').slice(0, 8);
 }
 
-// HTML redirect template for short URLs
+// Render redirect markup with canonical and JavaScript fallbacks
 function redirectTemplate(target) {
     return [
         '<!DOCTYPE html>',
@@ -28,29 +28,26 @@ function redirectTemplate(target) {
         '    }',
         '  </script>',
         '</body>',
-        '</html>'
+        '</html>',
     ].join('\n');
 }
 
-// Load projects from source/_projects/*.md
-// (used so we can generate short URLs for project pages too)
+// Read project front matter so project detail pages also receive short URLs
 function loadFolderProjects(hexo) {
     const base = path.join(hexo.base_dir, 'source', '_projects');
 
-    if (!fs.existsSync(base))
-        return [];
+    if (!fs.existsSync(base)) return [];
 
-    // Read all Markdown files
+    // Limit project discovery to Markdown files in the project source folder
     const entries = fs.readdirSync(base, { withFileTypes: true }),
         mdFiles = entries
-            .filter(entry => entry.isFile())
-            .map(entry => entry.name)
-            .filter(name => /\.(md|markdown)$/i.test(name)),
+            .filter((entry) => entry.isFile())
+            .map((entry) => entry.name)
+            .filter((name) => /\.(md|markdown)$/i.test(name)),
         projects = [];
 
-    // Parse each file, and add it to the projects array
-    mdFiles.forEach(filename => {
-        // Read the file
+    // Read project metadata while isolating file and front matter errors
+    mdFiles.forEach((filename) => {
         const full = path.join(base, filename);
         let raw;
         try {
@@ -61,7 +58,6 @@ function loadFolderProjects(hexo) {
             return;
         }
 
-        // Parse the front matter
         let parsed;
         try {
             parsed = fm.parse(raw);
@@ -71,7 +67,7 @@ function loadFolderProjects(hexo) {
             return;
         }
 
-        // Build the project object variables
+        // Preserve authored short hashes or derive them from project routes
         const slug = parsed.slug || filename.replace(/\.(md|markdown)$/i, ''),
             stat = fs.statSync(full),
             date = parsed.date ? new Date(parsed.date) : stat.mtime,
@@ -79,85 +75,75 @@ function loadFolderProjects(hexo) {
             keySource = parsed.short_hash || projectPath,
             short_hash = parsed.short_hash || makeShortHash(keySource);
 
-        // Add the project
         projects.push({
             slug,
             path: projectPath,
             title: parsed.title || slug,
             date,
-            short_hash
+            short_hash,
         });
     });
 
     return projects;
 }
 
-// In-memory map of path -> short_hash so templates can ask for a hash by path.
+// Index short hashes by path for template helpers
 const shortMap = {};
 
-// Add short hashes to posts
+// Attach short hashes to rendered post records
 hexo.extend.filter.register('after_post_render', function (data) {
-    // Only apply to posts (and optionally pages if you want)
-    if (data.layout !== 'post')
-        return data;
+    // Generate hashes only for post records
+    if (data.layout !== 'post') return data;
 
-    // Generate short hash
+    // Reuse authored hashes before deriving one from the post URL
     if (!data.short_hash)
-        data.short_hash = makeShortHash(data.permalink ||
-            data.path ||
-            data.slug ||
-            data.title);
+        data.short_hash = makeShortHash(data.permalink || data.path || data.slug || data.title);
 
-    // Add to in-memory map
-    if (data.path)
-        shortMap[data.path] = data.short_hash;
+    // Index the short hash by its full content route
+    if (data.path) shortMap[data.path] = data.short_hash;
 
     return data;
 });
 
-// Generator: short URLs for both blog and projects
+// Publish short URL redirects for posts and project detail pages
 hexo.extend.generator.register('theme_short_urls', function (locals) {
     const urlBase = (this.config.url || '').replace(/\/+$/, ''),
         routes = [];
 
-    // Loop through all posts
-    locals.posts.forEach(post => {
-        post.short_hash = post.short_hash || makeShortHash(post.permalink ||
-            post.path ||
-            post.slug ||
-            post.title);
+    // Generate a redirect route for every post
+    locals.posts.forEach((post) => {
+        post.short_hash =
+            post.short_hash ||
+            makeShortHash(post.permalink || post.path || post.slug || post.title);
 
-        // Add to in-memory map
-        if (post.path)
-            shortMap[post.path] = post.short_hash;
+        // Index the short hash by its full content route
+        if (post.path) shortMap[post.path] = post.short_hash;
 
-        // Create a redirect for each post
         routes.push({
             path: `s/${post.short_hash}/index.html`,
-            data: () => redirectTemplate(`${urlBase}/${post.path.replace(/^\/+/, '')}`)
+            data: () => redirectTemplate(`${urlBase}/${post.path.replace(/^\/+/, '')}`),
         });
     });
 
-    // Projects from source/_projects
+    // Read project routes directly from their source front matter
     const folderProjects = loadFolderProjects(this);
 
-    // Create a redirect for each project
-    folderProjects.forEach(project => {
+    // Publish project redirects using the same short hash lookup
+    folderProjects.forEach((project) => {
         const shortPath = `s/${project.short_hash}/index.html`;
         shortMap[project.path] = project.short_hash;
         routes.push({
             path: shortPath,
-            data: () => redirectTemplate(`${urlBase}/${project.path.replace(/^\/+/, '')}`)
+            data: () => redirectTemplate(`${urlBase}/${project.path.replace(/^\/+/, '')}`),
         });
     });
 
     return routes;
 });
 
-// Return the short_hash for a given path
+// Look up short hashes using normalized content paths
 hexo.extend.helper.register('short_hash_for', function (targetPath) {
-    if (!targetPath)
-        return '';
+    if (!targetPath) return '';
 
     // Remove leading slashes
     const key = String(targetPath).replace(/^\/+/, '');

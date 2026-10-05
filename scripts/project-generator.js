@@ -4,103 +4,40 @@ let fs = require('fs'),
     fm = require('hexo-front-matter'),
     { slugize } = require('hexo-util');
 
-// Cache to prevent infinite loops during generation
-let projectsCache = null;
+const { loadProjects } = require('../lib/content.cjs');
 
-// Load all projects from the _projects folder
-async function loadProjects(ctx) {
-    if (hexo.env?.env !== 'development' && Array.isArray(projectsCache))
-        return projectsCache;
-
-    const base = path.join(ctx.base_dir, 'source', '_projects');
-    if (!fs.existsSync(base))
-        return [];
-
-    const mdFiles = fs.readdirSync(base).filter(name => /\.(md|markdown)$/i.test(name)),
-        projects = [];
-
-    for (const filename of mdFiles) {
-        const fullPath = path.join(base, filename),
-            raw = fs.readFileSync(fullPath, 'utf8'),
-            parsed = fm.parse(raw);
-
-        // Prepare the data object for Hexo's internal post renderer
-        const data = Object.assign({}, parsed, {
-            content: parsed._content,
-            full_source: fullPath,
-            source: filename,
-            engine: 'markdown'
-        });
-
-        // Passing 'null' prevents Hexo from trying to read the file again
-        await ctx.post.render(null, data);
-        const slug = parsed.slug || filename.replace(/\.(md|markdown)$/i, ''),
-            stat = fs.statSync(fullPath);
-
-        // data.content has now been transformed into HTML by Hexo
-        // Store the project entry
-        projects.push({
-            ...parsed,
-            content: data.content,   // The fully processed body HTML
-            slug: slug,
-            path: `projects/${slug}/`,
-            date: parsed.date ? new Date(parsed.date) : stat.mtime,
-            project_tags: parsed.project_tags || parsed.tags || [],
-            read_time: (data.read_time ? data.read_time : {})
-        });
-    }
-
-    // Sort the projects by weight and date (descending)
-    return (projectsCache = projects.sort((a, b) => {
-        const wA = a.weight || 0,
-            wB = b.weight || 0;
-        if (wA !== wB)
-            return wB - wA;
-        return b.date - a.date;
-    }));
-}
-
-// Generator: /projects + paginated pages + project detail pages + project tags
+// Generate paginated project listings, detail pages, and tag archives
 hexo.extend.generator.register('theme_projects', async function (locals) {
     const theme = this.theme.config || {},
         projCfg = theme.projects || {},
         title = projCfg.title || 'Projects';
 
-    // Load all projects
+    // Load projects through the shared rendering and cache pipeline
     let allProjects = await loadProjects(this, hexo.base_dir);
-    if (!allProjects.length)
-        return [];
+    if (!allProjects.length) return [];
 
     const config = this.config || {},
         perPage =
-            projCfg.per_page ||
-            (config.index_generator && config.index_generator.per_page) ||
-            config.per_page ||
+            projCfg.per_page ??
+            (config.index_generator && config.index_generator.per_page) ??
+            config.per_page ??
             10,
         total = allProjects.length,
         totalPages = perPage > 0 ? Math.ceil(total / perPage) : 1,
         routes = [];
 
-    // Paginated listing: /projects/, /projects/page/2/, ...
+    // Generate project pages with page one at the listing root
     for (let i = 1; i <= totalPages; i++) {
         const current = i,
             listPath =
-                current === 1
-                    ? 'projects/index.html'
-                    : `projects/page/${current}/index.html`,
+                current === 1 ? 'projects/index.html' : `projects/page/${current}/index.html`,
             start = perPage > 0 ? perPage * (current - 1) : 0,
             end = perPage > 0 ? start + perPage : total,
             pageProjects = allProjects.slice(start, end),
             prev = current > 1 ? current - 1 : 0,
             next = current < totalPages ? current + 1 : 0,
-            prev_link =
-                prev > 0
-                    ? (prev === 1 ? 'projects/' : `projects/page/${prev}/`)
-                    : '',
-            next_link =
-                next > 0
-                    ? `projects/page/${next}/`
-                    : '';
+            prev_link = prev > 0 ? (prev === 1 ? 'projects/' : `projects/page/${prev}/`) : '',
+            next_link = next > 0 ? `projects/page/${next}/` : '';
 
         routes.push({
             path: listPath,
@@ -108,45 +45,56 @@ hexo.extend.generator.register('theme_projects', async function (locals) {
             data: {
                 title,
                 projects: pageProjects,
+                all_projects: allProjects,
                 current,
                 total: totalPages,
+                pagination_base: 'projects/',
+                pagination_per_page: perPage,
                 prev,
                 next,
                 prev_link,
-                next_link
-            }
+                next_link,
+            },
         });
     }
 
-    // Detail pages for _projects folder entries
-    allProjects.forEach(project => {
+    // Publish a detail route for each rendered project
+    allProjects.forEach((project) => {
         routes.push({
             path: project.path,
             layout: 'project',
             data: {
                 title: project.title,
-                project
-            }
+                project,
+            },
         });
     });
 
-    // Project tags: /project-tag/<tag>/
+    // Publish encrypted payloads separately from protected project placeholders
+    allProjects
+        .filter((p) => p.encrypted && p.encrypted_payload)
+        .forEach((p) =>
+            routes.push({
+                path: `_encrypted/${p._id}.json`,
+                data: JSON.stringify(p.encrypted_payload),
+            })
+        );
+    // Group projects into their tag archives
     const tags = {};
-    allProjects.forEach(project => {
+    allProjects.forEach((project) => {
         const pTags = project.project_tags || [];
-        pTags.forEach(tag => {
-            if (!tags[tag])
-                tags[tag] = [];
+        pTags.forEach((tag) => {
+            if (!tags[tag]) tags[tag] = [];
             tags[tag].push(project);
         });
     });
 
-    Object.keys(tags).forEach(tag => {
+    Object.keys(tags).forEach((tag) => {
         const tagProjects = tags[tag],
             tagSlug = slugize(tag, { transform: 1 }),
             tagTotalPages = perPage > 0 ? Math.ceil(tagProjects.length / perPage) : 1;
 
-        // Paginated listing: /project-tag/<tag>/, /project-tag/<tag>/page/2/, ...
+        // Paginate each project tag with the same page size as the main listing
         for (let i = 1; i <= tagTotalPages; i++) {
             const current = i,
                 base = `project-tag/${tagSlug}`,
@@ -159,22 +107,25 @@ hexo.extend.generator.register('theme_projects', async function (locals) {
                 prev_link = prev > 0 ? (prev === 1 ? `${base}/` : `${base}/page/${prev}/`) : '',
                 next_link = next > 0 ? `${base}/page/${next}/` : '';
 
-            // Add route to collection
+            // Publish the current project tag page with its pagination metadata
             routes.push({
                 path: path,
                 layout: 'projects',
                 data: {
                     title: `Projects: ${tag}`,
                     projects: pageProjects,
+                    all_projects: tagProjects,
                     current,
                     total: tagTotalPages,
+                    pagination_base: `${base}/`,
+                    pagination_per_page: perPage,
                     prev,
                     next,
                     prev_link,
                     next_link,
                     is_tag_page: true,
-                    tag_name: tag
-                }
+                    tag_name: tag,
+                },
             });
         }
     });
@@ -182,12 +133,12 @@ hexo.extend.generator.register('theme_projects', async function (locals) {
     return routes;
 });
 
-// Helper for sidebar
+// Return the latest rendered projects for sidebar listings
 hexo.extend.helper.register('recent_projects', function (limit = 5) {
-    return (projectsCache || []).slice(0, limit);
+    return (hexo.fluxProjects || []).slice(0, limit);
 });
 
-// Helper to generate project tag URLs
+// Build site-root URLs from normalized project tag slugs
 hexo.extend.helper.register('project_tag_url', function (tag) {
     return this.url_for(`/project-tag/${slugize(tag, { transform: 1 })}/`);
 });

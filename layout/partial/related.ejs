@@ -1,0 +1,13 @@
+<% var item = page.project || page, matches = theme.related_content?.enabled === false ? [] : flux_related(item), freshness = flux_freshness(item); %>
+<% if (theme.content_freshness?.enabled !== false && freshness.updated) { %><p
+    class="content-freshness">Updated <time
+        datetime="<%= freshness.updated %>"><%= freshness.updated.slice(0,10) %></time></p><% } %>
+<% if (freshness.stale) { %><aside class="alert alert-info">This article was last updated over
+    <%= theme.content_freshness.stale_notice.after_days || 365 %> days ago. Some details may have
+    changed.</aside><% } %>
+<% if (matches.length) { %><section class="related-content">
+    <h2>Related content</h2>
+    <ul><% matches.forEach(function(d) { %><li><a
+                href="<%= d.url %>"><%= d.title %></a><% if (d.encrypted) { %> 🔒<span> Password
+                protected</span><% } %></li><% }); %></ul>
+</section><% } %>

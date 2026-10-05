@@ -1,84 +1,86 @@
 <article class="post-single" x-data="readingProgress">
-  <div class="reading-progress-bar" :style="`width: ${progress}%`"></div>
+    <div class="reading-progress-bar" :style="`width: ${progress}%`"></div>
 
-  <h2 class="post-title">
-    <%= page.title || (page.project && page.project.title) %>
-  </h2>
+    <h2 class="post-title">
+        <%= page.title || (page.project && page.project.title) %>
+    </h2>
 
-  <% if (page.project) { %>
-  <div class="post-meta">
-    <time datetime="<%= date_xml(page.project.date) %>">
-      <%= date(page.project.date, config.date_format || 'YYYY-MM-DD') %>
-    </time>
+    <% if (page.project) { %>
+    <div class="post-meta">
+        <time datetime="<%= date_xml(page.project.date) %>">
+            <%= date(page.project.date, config.date_format || 'YYYY-MM-DD') %>
+        </time>
 
-    <% if (page.project.read_time) { %>
-    <span class="meta-sep">-</span>
-    <%= read_time(page.project, true) %>
-    <% } %>
-  </div>
-
-  <% var projectToc = toc(page.project.content, {class: 'toc', list_number: false}); %>
-  <% if (projectToc) { %>
-  <div class="post-toc" x-data="{ open: false }">
-    <button type="button" class="post-btn post-toc-toggle" @click="open = !open" :aria-expanded="open">
-      <span>Table of Contents</span>
-      <span x-text="open ? '-' : '+'"></span>
-    </button>
-    <div class="post-toc-content" x-show="open" x-transition x-cloak>
-      <%- projectToc %>
-    </div>
-  </div>
-  <% } %>
-
-  <div class="post-body-grid">
-    <div class="post-content" x-ref="content">
-      <%- page.project.content || '' %>
+        <% if (page.project.read_time) { %>
+        <span class="meta-sep">-</span>
+        <%= read_time(page.project, true) %>
+        <% } %>
     </div>
 
+    <% var projectToc = toc(page.project.content, {class: 'toc', list_number: false}); %>
     <% if (projectToc) { %>
-    <aside class="post-toc-desktop" x-data="tocSpy">
-      <div class="toc-title">On this page</div>
-      <%- projectToc %>
-    </aside>
+    <div class="post-toc" x-data="{ open: false }">
+        <button type="button" class="post-btn post-toc-toggle" @click="open = !open"
+            :aria-expanded="open">
+            <span>Table of Contents</span>
+            <span x-text="open ? '-' : '+'"></span>
+        </button>
+        <div class="post-toc-content" x-show="open" x-transition x-cloak>
+            <%- projectToc %>
+        </div>
+    </div>
     <% } %>
-  </div>
 
-  <% if (page.project.project_tags && page.project.project_tags.length) { %>
-  <div class="post-tags">
-    Tags:
-    <% page.project.project_tags.forEach(function(tag, i) { %>
-    <a href="<%= project_tag_url(tag) %>"><%= tag %></a><%= i < page.project.project_tags.length - 1 ? ', ' : '' %>
-    <% }); %>
-  </div>
-  <% } %>
+    <%- partial('partial/reading-tools') %>
+    <div class="post-body-grid">
+        <div class="post-content" x-ref="content">
+            <%- page.project.content || '' %>
+        </div>
 
-  <div class="post-meta-bottom">
-    <% if (page.project.buttons && page.project.buttons.length) { %>
-    <nav>
-      <% page.project.buttons.forEach(function(button) { %>
-      <a href="<%= button.url %>" class="post-btn" target="_blank" rel="noopener">
-        <%= button.text || button.name %>
-      </a>
-      <% }); %>
-    </nav>
+        <% if (projectToc) { %>
+        <aside class="post-toc-desktop" x-data="tocSpy">
+            <div class="toc-title">On this page</div>
+            <%- projectToc %>
+        </aside>
+        <% } %>
+    </div>
+
+    <% if (page.project.project_tags && page.project.project_tags.length) { %>
+    <div class="post-tags">
+        Tags:
+        <% page.project.project_tags.forEach(function(tag, i) { %>
+        <a
+            href="<%= project_tag_url(tag) %>"><%= tag %></a><%= i < page.project.project_tags.length - 1 ? ', ' : '' %>
+        <% }); %>
+    </div>
     <% } %>
-    <% var hash = short_hash_for(page.project.path); %>
-    <% if (hash) { %>
-    <a href="<%= url_for('/s/' + hash + '/') %>">
-      #<%= hash %>
-    </a>
+
+    <div class="post-meta-bottom">
+        <% if (page.project.buttons && page.project.buttons.length) { %>
+        <nav>
+            <% page.project.buttons.forEach(function(button) { %>
+            <a href="<%= button.url %>" class="post-btn" target="_blank" rel="noopener">
+                <%= button.text || button.name %>
+            </a>
+            <% }); %>
+        </nav>
+        <% } %>
+        <% var hash = short_hash_for(page.project.path); %>
+        <% if (hash) { %>
+        <a href="<%= url_for('/s/' + hash + '/') %>">
+            #<%= hash %>
+        </a>
+        <% } %>
+    </div>
+    <% if (theme.comments && theme.comments.enabled) { %>
+    <% if (!page.project.encrypted && (!('comments' in page.project) || ('comments' in page.project && page.project.comments !== false))) { %>
+    <%- partial('partial/comments') %>
+    <% } else { %>
+    <hr />
+    Comments have been disabled for this project.
+    <% } } %>
+    <% } else { %>
+    <p>Project data missing.</p>
     <% } %>
-  </div>
-  <% if (theme.comments && theme.comments.enabled) { %>
-  <% if (!('comments' in page.project) || ('comments' in page.project && page.project.comments !== false)) { %>
-  <%- partial('partial/comments') %>
-  <% } else { %>
-  <hr />
-  Comments have been disabled for this project.
-  <% } } %>
-  <% } else { %>
-  <p>Project data missing.</p>
-  <% } %>
+    <%- partial('partial/related') %>
 </article>
-<script src="<%= url_for('/js/reading-progress.js') %>"></script>
-<script src="<%= url_for('/js/toc-spy.js') %>"></script>

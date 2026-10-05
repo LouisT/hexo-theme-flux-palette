@@ -1,54 +1,42 @@
-<script src="<%= url_for('/js/sidebar.js') %>"></script>
-
 <div class="sidebar-section" x-data="sidebarSection('about')">
-  <h3 @click="toggle">
-    <span>About</span>
-    <span x-text="open ? '-' : '+'"></span>
-  </h3>
-  <div id="sb-about" x-show="open" x-collapse>
-    <%= config.description || 'An undescript website.' %>
-  </div>
-  <script>
-    (function() {
-      var stored = sessionStorage.getItem('flux-sidebar-about');
-      if (stored === 'false')
-        document.getElementById('sb-about').style.display = 'none';
-    })();
-  </script>
+    <h3><button type="button" class="sidebar-toggle" @click="toggle" :aria-expanded="open"
+            :aria-controls="'sb-' + id">
+            <span>About</span>
+            <span x-text="open ? '-' : '+'"></span>
+        </button></h3>
+    <div id="sb-about" x-show="open" x-collapse>
+        <%= config.description || 'An undescript website.' %>
+    </div>
+
 </div>
 
 <% if (has_social_buttons()) { %>
 <div class="sidebar-section social-buttons">
-  <%- social_buttons() %>
+    <%- social_buttons() %>
 </div>
 <% } %>
 
 <div class="sidebar-section" x-data="sidebarSection('posts')">
-  <h3 @click="toggle">
-    <span>Recent Posts</span>
-    <span x-text="open ? '-' : '+'"></span>
-  </h3>
-  <div id="sb-posts" x-show="open" x-collapse>
-    <ul>
-      <% site.posts.sort('date', -1).limit(5).forEach(function(post) { %>
-      <li>
-        <a href="<%= url_for(post.path) %>">
-          <% if (post.encrypted) { %>
-          <%- partial('partial/lock') %>
-          <% } %>
-          <span><%= post.title %></span>
-        </a>
-      </li>
-      <% }) %>
-    </ul>
-  </div>
-  <script>
-    (function() {
-      var stored = sessionStorage.getItem('flux-sidebar-posts');
-      if (stored === 'false')
-        document.getElementById('sb-posts').style.display = 'none';
-    })();
-  </script>
+    <h3><button type="button" class="sidebar-toggle" @click="toggle" :aria-expanded="open"
+            :aria-controls="'sb-' + id">
+            <span>Recent Posts</span>
+            <span x-text="open ? '-' : '+'"></span>
+        </button></h3>
+    <div id="sb-posts" x-show="open" x-collapse>
+        <ul>
+            <% site.posts.sort('date', -1).limit(5).forEach(function(post) { %>
+            <li>
+                <a href="<%= url_for(post.path) %>">
+                    <% if (post.encrypted) { %>
+                    <%- partial('partial/lock') %>
+                    <% } %>
+                    <span><%= post.title %></span>
+                </a>
+            </li>
+            <% }) %>
+        </ul>
+    </div>
+
 </div>
 
 <%
@@ -60,32 +48,31 @@ var sidebarCfg = theme.sidebar || {},
 %>
 <% if (rpEnabled && recentProjects.length) { %>
 <div class="sidebar-section" x-data="sidebarSection('projects')">
-  <h3 @click="toggle">
-    <span>Recent Projects</span>
-    <span x-text="open ? '-' : '+'"></span>
-  </h3>
-  <div id="sb-projects" x-show="open" x-collapse>
-    <ul>
-      <% recentProjects.forEach(function(project) { var href = project.path ? url_for(project.path): (project.project_url || '#'); %>
-      <li>
-        <a href="<%= href %>">
-          <% if (project.password) { %>
-          <%- partial('partial/lock') %>
-          <% } %>
-          <span><%= project.title %></span>
-        </a>
-      </li>
-      <% }); %>
-    </ul>
-  </div>
-  <script>
-    (function() {
-      var stored = sessionStorage.getItem('flux-sidebar-projects');
-      if (stored === 'false')
-        document.getElementById('sb-projects').style.display = 'none';
-    })();
-  </script>
+    <h3><button type="button" class="sidebar-toggle" @click="toggle" :aria-expanded="open"
+            :aria-controls="'sb-' + id">
+            <span>Recent Projects</span>
+            <span x-text="open ? '-' : '+'"></span>
+        </button></h3>
+    <div id="sb-projects" x-show="open" x-collapse>
+        <ul>
+            <% recentProjects.forEach(function(project) { var href = project.path ? url_for(project.path): (project.project_url || '#'); %>
+            <li>
+                <a href="<%= href %>">
+                    <% if (project.password) { %>
+                    <%- partial('partial/lock') %>
+                    <% } %>
+                    <span><%= project.title %></span>
+                </a>
+            </li>
+            <% }); %>
+        </ul>
+    </div>
+
 </div>
 <% } %>
 
 <%- partial('partial/palette-selector') %>
+<% if (theme.reading?.enabled !== false) { %><div class="sidebar-section"><a
+        href="<%= url_for('/reading/') %>">Reading list</a></div><% } %>
+<% if (theme.playground?.enabled) { %><div class="sidebar-section"><a
+        href="<%= url_for('/playground/') %>">Theme playground</a></div><% } %>

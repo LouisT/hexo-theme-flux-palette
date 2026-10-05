@@ -1,5 +1,5 @@
 <section class="archive">
-  <%
+    <%
     var archiveDir = String(config.archive_dir || 'archives').replace(/^\/+|\/+$/g, ''),
       archivePath = String(page.path || '').replace(/^\/+/, ''),
       archiveCfg = theme.archive || {},
@@ -92,49 +92,48 @@
     }
   %>
 
-  <h1><%= page.title || 'Archives' %></h1>
+    <h1><%= page.title || 'Archives' %></h1>
 
-  <% if (!allPosts.length) { %>
-  <p>No archived posts found.</p>
-  <% } %>
+    <% if (!allPosts.length) { %>
+    <p>No archived posts found.</p>
+    <% } %>
 
-  <% visibleYears.forEach(function(year) { %>
-  <div class="archive-year">
-    <h2>
-      <%= year %>
-      <span class="archive-year-count"><%= years[year].length %></span>
-    </h2>
-    <div class="archive-year-scroll">
-      <ul class="archive-year-list">
-      <% years[year].forEach(function(post) { %>
-      <li>
-        <span class="archive-date">
-          <%= date(post.date, 'MM-DD') %>
-        </span>
-        <a href="<%= url_for(post.path) %>"><%= post.title %></a>
-        <% if (post.encrypted) { %>
-        <%- partial('partial/lock') %>
-        <% } %>
-      </li>
-      <% }) %>
-      </ul>
+    <% visibleYears.forEach(function(year) { %>
+    <div class="archive-year">
+        <h2>
+            <%= year %>
+            <span class="archive-year-count"><%= years[year].length %></span>
+        </h2>
+        <div class="archive-year-scroll">
+            <ul class="archive-year-list">
+                <% years[year].forEach(function(post) { %>
+                <li>
+                    <span class="archive-date">
+                        <%= date(post.date, 'MM-DD') %>
+                    </span>
+                    <a href="<%= url_for(post.path) %>"><%= post.title %></a>
+                    <% if (post.encrypted) { %>
+                    <%- partial('partial/lock') %>
+                    <% } %>
+                </li>
+                <% }) %>
+            </ul>
+        </div>
     </div>
-  </div>
-  <% }) %>
+    <% }) %>
 
-  <% if (prev || next) { %>
-  <nav class="pagination archive-pagination">
-    <% if (prev) { %>
-    <a class="prev" href="<%= url_for(prevLink) %>">
-      &laquo; Newer
-    </a>
+    <% if (prev || next) { %>
+    <nav class="pagination archive-pagination" aria-label="Archive pages">
+        <% if (prev) { %>
+        <a class="pagination-link prev" href="<%= url_for(prevLink) %>" rel="prev">
+            &laquo; Newer
+        </a>
+        <% } %>
+        <% if (next) { %>
+        <a class="pagination-link next" href="<%= url_for(nextLink) %>" rel="next">
+            Older &raquo;
+        </a>
+        <% } %>
+    </nav>
     <% } %>
-    <span class="meta-sep">&nbsp;</span>
-    <% if (next) { %>
-    <a class="next" href="<%= url_for(nextLink) %>">
-      Older &raquo;
-    </a>
-    <% } %>
-  </nav>
-  <% } %>
 </section>

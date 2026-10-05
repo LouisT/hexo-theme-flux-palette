@@ -21,6 +21,7 @@
     margin: 1.5rem 0;
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
+    corner-shape: var(--corner-shape);
     background: var(--bg-card);
     overflow: hidden;
     box-shadow: var(--shadow-soft);
@@ -28,24 +29,26 @@
 
 .tabs-nav {
     display: flex;
+    flex-wrap: wrap;
     background: var(--bg-black);
     border-bottom: 1px solid var(--border);
 }
 
 .tab-btn {
-    padding: 0.8rem 1.2rem;
+    min-height: var(--control-height);
+    max-width: 100%;
+    padding: var(--control-padding-block) var(--control-padding-inline);
     background: transparent;
     border: none;
     border-right: 1px solid var(--border-code);
     color: var(--muted);
-    font-family: var(--font-sans);
-    font-weight: 600;
-    font-size: 0.9rem;
+    font: 500 var(--control-font-size) / 1.4 var(--font-sans);
     cursor: pointer;
     transition:
         background var(--transition-fast),
         color var(--transition-fast);
-    white-space: nowrap;
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 
 .tab-btn:hover {
@@ -77,6 +80,7 @@
     margin: 1.5rem 0;
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
+    corner-shape: var(--corner-shape);
     background: var(--bg-card);
     overflow: hidden;
     box-shadow: var(--shadow-soft);
@@ -95,13 +99,13 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1rem 1.25rem;
+    min-height: var(--control-height);
+    gap: var(--control-gap);
+    padding: var(--control-padding-block) var(--control-padding-inline);
     background: transparent;
     border: none;
     color: var(--text);
-    font-family: var(--font-sans);
-    font-size: 1rem;
-    font-weight: 600;
+    font: 500 var(--control-font-size) / 1.4 var(--font-sans);
     cursor: pointer;
     transition:
         background var(--transition-fast),
@@ -117,6 +121,11 @@
 .accordion-header.active {
     color: var(--accent);
     background: var(--bg-black);
+}
+
+.tab-btn:focus-visible,
+.accordion-header:focus-visible {
+    outline-offset: -3px;
 }
 
 .accordion-content {
@@ -153,7 +162,7 @@ pre[class*="language-"] {
     background: var(--hl-bg);
     color: var(--hl-base);
     border: 1px solid var(--border-code);
-    border-radius: var(--radius-lg);
+    border-radius: 0;
     line-height: 1.5;
     margin: 1.5rem 0;
     overflow-x: auto;
@@ -184,6 +193,7 @@ pre[class*="language-"]::-webkit-scrollbar-thumb:hover {
 /* Hexo specifics */
 figure.highlight pre {
     border: none;
+    border-radius: 0;
     margin: 0;
     padding: 0;
     background: none;
@@ -249,6 +259,7 @@ pre[class*="language-"] {
     color: var(--accent);
     padding: 0.2em 0.4em;
     border-radius: 4px;
+    corner-shape: var(--corner-shape);
     font-family: var(--font-mono);
     font-size: 0.85em;
     word-break: break-word;
@@ -293,16 +304,17 @@ figure.highlight {
     flex-direction: column;
     margin: 1.5rem 0;
     border: 1px solid var(--border-code);
-    border-radius: var(--radius-lg);
+    border-radius: 0;
     background: var(--hl-bg);
     overflow: hidden;
 }
 
 .code-actions {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: flex-start;
-    gap: 0.6rem;
+    gap: var(--control-gap);
     padding: 0.5rem 1rem;
     background: var(--bg-alt);
     border-bottom: 1px solid var(--border-code);
@@ -318,10 +330,13 @@ figure.highlight table {
 }
 
 .code-lang {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--control-height);
     margin-right: auto;
     order: 1;
     font-family: var(--font-sans);
-    font-size: 0.7rem;
+    font-size: var(--control-font-size);
     font-weight: 700;
     color: var(--muted);
     text-transform: uppercase;
@@ -330,27 +345,11 @@ figure.highlight table {
 
 .code-copy-btn {
     order: 2;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.4rem;
-    padding: 0.25rem 0.6rem;
-    font-size: 0.75rem;
-    background: var(--bg-card);
-    border: 1px solid var(--border-card);
-    border-radius: 4px;
-    cursor: pointer;
-    color: var(--muted);
 }
 
 .code-copy-btn svg {
     flex-shrink: 0;
     display: block;
-}
-
-.code-copy-btn:hover {
-    color: var(--accent);
-    border-color: var(--accent-soft);
 }
 
 /* Comments & Documentation */
@@ -504,6 +503,7 @@ figure.highlight table {
 .alert {
     position: relative;
     border-radius: var(--radius-lg);
+    corner-shape: var(--corner-shape);
     padding: 1.1rem 1.4rem;
     margin: 1.5rem 0;
     overflow: hidden;
@@ -601,6 +601,10 @@ figure.highlight table {
 
 /* Spoiler/redacted text */
 .spoiler {
+    display: inline;
+    border: 0;
+    font: inherit;
+    line-height: inherit;
     background-color: var(--text);
     color: var(--text);
     cursor: pointer;
@@ -608,6 +612,7 @@ figure.highlight table {
         background-color var(--transition-fast),
         color var(--transition-fast);
     border-radius: 2px;
+    corner-shape: var(--corner-shape);
     padding: 0 2px;
 }
 
@@ -638,6 +643,7 @@ figure.highlight table {
     padding: 0.75rem 1rem;
     margin-left: -1rem;
     border-radius: var(--radius-lg);
+    corner-shape: var(--corner-shape);
     transition: background var(--transition-fast);
 }
 

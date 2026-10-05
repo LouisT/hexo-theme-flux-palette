@@ -1,5 +1,5 @@
 <div class="footer-inner">
-  <%
+    <%
     var feedsCfg = theme.feeds || {},
       feedsEnabled = feedsCfg.enabled !== false,
       toPath = function (target) {
@@ -21,28 +21,31 @@
       atomPath = atomCfg.path || 'atom.xml',
       sitemapPath = sitemapCfg.path || 'sitemap.xml';
   %>
-  <div class="footer-left">
-    <div class="footer-copyright">
-      &copy; <%= new Date().getFullYear() %> <%= config.author %>
+    <div class="footer-left">
+        <div class="footer-copyright">
+            &copy; <%= new Date().getFullYear() %> <%= config.author %>
+        </div>
+        <% if (rssLinkEnabled || atomLinkEnabled || sitemapLinkEnabled) { %>
+        <div class="footer-feed-links">
+            <% if (rssLinkEnabled) { %>
+            <a class="footer-feed-link" href="<%= url_for(toPath(rssPath)) %>"
+                data-no-view-transition="true">RSS</a>
+            <% } %>
+            <% if (atomLinkEnabled) { %>
+            <a class="footer-feed-link" href="<%= url_for(toPath(atomPath)) %>"
+                data-no-view-transition="true">Atom</a>
+            <% } %>
+            <% if (sitemapLinkEnabled) { %>
+            <a class="footer-feed-link" href="<%= url_for(toPath(sitemapPath)) %>"
+                data-no-view-transition="true">Sitemap</a>
+            <% } %>
+        </div>
+        <% } %>
     </div>
-    <% if (rssLinkEnabled || atomLinkEnabled || sitemapLinkEnabled) { %>
-    <div class="footer-feed-links">
-      <% if (rssLinkEnabled) { %>
-      <a class="footer-feed-link" href="<%= url_for(toPath(rssPath)) %>" data-no-view-transition="true">RSS</a>
-      <% } %>
-      <% if (atomLinkEnabled) { %>
-      <a class="footer-feed-link" href="<%= url_for(toPath(atomPath)) %>" data-no-view-transition="true">Atom</a>
-      <% } %>
-      <% if (sitemapLinkEnabled) { %>
-      <a class="footer-feed-link" href="<%= url_for(toPath(sitemapPath)) %>" data-no-view-transition="true">Sitemap</a>
-      <% } %>
+
+    <% if (theme.attribution && theme.attribution.enabled) { %>
+    <div class="footer-right">
+        <a href="<%= theme.attribution.link %>"><%= theme.attribution.text %></a>
     </div>
     <% } %>
-  </div>
-
-  <% if (theme.attribution && theme.attribution.enabled) { %>
-  <div class="footer-right">
-    <a href="<%= theme.attribution.link %>"><%= theme.attribution.text %></a>
-  </div>
-  <% } %>
 </div>

@@ -1,0 +1,48 @@
+[
+    {
+        "slug": "sample-notes",
+        "title": "Field notes",
+        "date": "2025-03-01",
+        "project_tags": [
+            "Markdown",
+            "JavaScript"
+        ],
+        "project_category": "Writing",
+        "project_status": "Active",
+        "project_summary": "A sample journal with reading tools and local bookmarks."
+    },
+    {
+        "slug": "sample-gallery",
+        "title": "Image gallery",
+        "date": "2025-02-01",
+        "project_tags": [
+            "Photography",
+            "JavaScript"
+        ],
+        "project_category": "Media",
+        "project_status": "Complete",
+        "project_summary": "A sample collection demonstrating responsive galleries."
+    },
+    {
+        "slug": "sample-archive",
+        "title": "Archived prototype",
+        "date": "2025-01-01",
+        "project_tags": [
+            "TypeScript"
+        ],
+        "project_category": "Tools",
+        "project_status": "Archived",
+        "project_summary": "A sample project for filtering by status."
+    },
+    {
+        "slug": "sample-private",
+        "title": "Protected example",
+        "date": "2025-01-01",
+        "project_tags": [
+            "Markdown"
+        ],
+        "project_category": "Writing",
+        "project_status": "Active",
+        "encrypted": true
+    }
+]

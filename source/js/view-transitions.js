@@ -1,194 +1,159 @@
-// View Transitions API SPA-style navigation with Alpine support
 (function () {
-    // Bail out when the browser doesn't support view transitions
-    if (!('startViewTransition' in document))
-        return;
+    if (window.FluxNavigation) return;
+    window.FluxNavigation = true;
+    const positions = new Map();
+    let path = location.pathname + location.search,
+        sequence = 0,
+        controller;
+    const id = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
+    let entry = history.state?.flux_entry || id();
+    history.replaceState({ ...history.state, flux_entry: entry }, '');
+    if (document.startViewTransition) history.scrollRestoration = 'manual';
 
-    // Track the current URL to compare against for hash changes
-    let currentPath = window.location.pathname + window.location.search;
+    // Remember history scroll positions only for public articles
+    function capture() {
+        if (!Flux.manifest.article?.encrypted) positions.set(entry, Flux.scrollTop());
+        else positions.delete(entry);
+    }
 
-    // Decide if a link click should be handled by the transition
-    function shouldHandleLink(link, event = null) {
-        // Basic validation & Accessibility/UX checks
-        if (!link?.href)
-            return false;
+    document.addEventListener('scroll', capture, true);
 
-        // Ignore non-user-initiated events
-        if (event) {
-            // Ignore default clicks
-            if (event?.defaultPrevented)
-                return false;
-            // Ignore modified clicks (Ctrl, Command, Shift, Alt) to allow 'open in new tab'
-            if (event?.metaKey || event?.ctrlKey || event?.shiftKey || event?.altKey)
-                return false;
+    // Wait for an animation frame before measuring the restored layout
+    function frame() {
+        return new Promise((resolve) => requestAnimationFrame(resolve));
+    }
+
+    // Restore history positions after layout settles or reveal the destination heading
+    async function position(manifest, restore, request) {
+        await frame();
+        await frame();
+        if (request !== sequence) return;
+        if (restore !== undefined && !manifest.article?.encrypted) {
+            Flux.scrollTo(restore);
+            // Retry scroll restoration for late layout changes until the visitor interacts
+            const observer = new ResizeObserver(() => {
+                    if (request === sequence) Flux.scrollTo(restore);
+                }),
+                // Stop scroll restoration once the visitor interacts or its timeout expires
+                stop = () => {
+                    observer.disconnect();
+                    clearTimeout(timer);
+                    for (const name of ['wheel', 'touchstart', 'keydown', 'pointerdown'])
+                        removeEventListener(name, stop);
+                },
+                timer = setTimeout(stop, 1000);
+
+            for (const name of ['wheel', 'touchstart', 'keydown', 'pointerdown'])
+                addEventListener(name, stop, { once: true });
+            observer.observe(document.getElementById('main-content'));
+            setTimeout(() => {
+                if (request !== sequence) stop();
+            }, 0);
+        } else {
+            Flux.scrollTo(0);
+            if (location.hash && !location.hash.startsWith('#theme=')) {
+                try {
+                    document
+                        .getElementById(decodeURIComponent(location.hash.slice(1)))
+                        ?.scrollIntoView();
+                } catch {}
+            } else document.getElementById('main-content')?.focus({ preventScroll: true });
         }
+    }
 
-        // Ignore external targets or download attributes
-        if (link.target && link.target !== '_self')
-            return false;
-        if (link.hasAttribute('download'))
-            return false;
-
-        // Manual opt-out via data attribute
-        if (link.hasAttribute('data-no-view-transition'))
-            return false;
-
+    // Prepare destination features and swap the page only for the latest navigation
+    async function navigate(url, push, targetEntry) {
+        const request = ++sequence;
+        controller?.abort();
+        controller = new AbortController();
+        const restore = push ? undefined : positions.get(targetEntry);
         try {
-            const url = new URL(link.href),
-                now = window.location;
-
-            // Check Origin (Protocol + Domain + Port)
-            if (url.origin !== now.origin)
-                return false;
-
-            // Only handle standard web protocols
-            if (!['http:', 'https:'].includes(url.protocol))
-                return false;
-
-            // Ignore anchors on the same page
-            if (url.pathname === now.pathname) {
-                // Ignore anchors with a hash on the same page
-                if (url.hash.length >= 1)
-                    return false;
-                // Ignore search parameters on the same page
-                else if (url.search.length >= 1)
-                    return false;
-            }
-
-            // Return true for valid URLs
-            return true;
-        } catch {
-            // Handle invalid URLs gracefully
-            return false;
-        }
-    }
-
-    // Helper to handle scrolling to #hash or top
-    function scrollToTarget(hash) {
-        if (hash) {
-            const id = decodeURIComponent(hash.substring(1)),
-                target = document.getElementById(id) || document.getElementsByName(id)[0];
-            if (target)
-                return target.scrollIntoView();
-        }
-        window.scrollTo(0, 0);
-    }
-
-    // Recreate scripts so they execute after swapping the body
-    function reexecuteBodyScripts(root) {
-        const scripts = root.querySelectorAll('script'),
-            loaders = [];
-
-        // Loop through the scripts and recreate them
-        scripts.forEach(oldScript => {
-            const type = (oldScript.getAttribute('type') || '').toLowerCase();
-            if (type === 'application/ld+json')
+            const res = await fetch(url, { signal: controller.signal });
+            if (!res.ok) throw new Error('Navigation failed');
+            const doc = new DOMParser().parseFromString(await res.text(), 'text/html'),
+                manifest = JSON.parse(doc.getElementById('flux-manifest').textContent);
+            // Reload fully when asset versions differ so old scripts cannot control new markup
+            if (manifest.asset_version !== Flux.manifest.asset_version) {
+                if (request === sequence) location.href = url;
                 return;
-
-            // Create a new script element
-            const newScript = document.createElement('script');
-            Array.prototype.forEach.call(oldScript.attributes, attr => {
-                newScript.setAttribute(attr.name, attr.value)
-            });
-
-            // Copy the content from the old script to the new one
-            if (oldScript.src)
-                loaders.push(new Promise(function (resolve, reject) {
-                    newScript.onload = resolve;
-                    newScript.onerror = reject;
-                }));
-            else
-                newScript.text = oldScript.text;
-
-            // Replace the old script with the new one
-            oldScript.replaceWith(newScript);
-        });
-
-        // Wait for all loaders to resolve
-        return Promise.all(loaders);
-    }
-
-    // Fetch the next page, swap the body, and re-init Alpine
-    async function swapPage(url, push) {
-        try {
-            // Show loading state
-            document.documentElement.classList.add('is-loading');
-
-            // Fetch the new page
-            let response = await fetch(url, {
-                headers: {
-                    'X-Requested-With': 'flux-palette/view-transitions'
+            }
+            await Flux.prepare(manifest);
+            if (request !== sequence) return;
+            // Destroy outgoing Alpine state before replacing metadata and initializing the new body
+            const swap = () => {
+                Flux.emit('leave');
+                Alpine.stopObservingMutations();
+                Alpine.destroyTree(document.body);
+                entry = push ? id() : targetEntry || id();
+                if (push) history.pushState({ flux_entry: entry }, '', url);
+                else if (!targetEntry)
+                    history.replaceState({ ...history.state, flux_entry: entry }, '');
+                path = location.pathname + location.search;
+                document.title = doc.title;
+                for (const selector of [
+                    'meta[name="description"]',
+                    'meta[property^="og:"]',
+                    'meta[name^="twitter:"]',
+                    'link[rel="canonical"]',
+                    'script[data-flux-schema]',
+                ]) {
+                    document.head.querySelectorAll(selector).forEach((el) => el.remove());
+                    doc.head
+                        .querySelectorAll(selector)
+                        .forEach((el) => document.head.appendChild(el.cloneNode(true)));
                 }
-            });
-
-            // Bail out if the request failed
-            if (!response.ok)
-                throw new Error('Failed to fetch page');
-
-            // Parse the HTML
-            let doc = new DOMParser().parseFromString(await response.text(), 'text/html');
-
-            // Bail out if the HTML is invalid
-            if (!doc || !doc.body)
-                throw new Error('Invalid HTML');
-
-            // Stop Alpine from observing mutations on the old page
-            let alpine = window.Alpine;
-            if (alpine && typeof alpine.stopObservingMutations === 'function')
-                alpine.stopObservingMutations();
-
-            // Swap the title and body
-            document.title = doc.title || document.title;
-            document.body.replaceWith(doc.body);
-            await reexecuteBodyScripts(document.body);
-
-            // Re-init Alpine
-            if (alpine && typeof alpine.initTree === 'function') {
-                document.dispatchEvent(new CustomEvent('alpine:init'));
-                alpine.initTree(document.body);
-            }
-
-            // Start Alpine observing mutations
-            if (alpine && typeof alpine.startObservingMutations === 'function')
-                alpine.startObservingMutations();
-
-            // Swap the URL and scroll
-            if (push) {
-                history.pushState(null, '', url);
-                currentPath = window.location.pathname + window.location.search;
-            }
-
-            // Scroll to the top or target
-            scrollToTarget(window.location.hash);
-        } catch {
-            // If fetch fails, fall back to standard navigation
-            window.location.href = url;
-        } finally {
-            // Hide loading state
-            document.documentElement.classList.remove('is-loading');
+                Flux.manifest = manifest;
+                document.body.replaceWith(doc.body);
+                Alpine.initTree(document.body);
+                Alpine.startObservingMutations();
+                Flux.emit('page', manifest);
+            };
+            if (document.startViewTransition && !Flux.reduced())
+                await document.startViewTransition(swap).updateCallbackDone;
+            else swap();
+            await position(manifest, restore, request);
+        } catch (error) {
+            if (error.name !== 'AbortError' && request === sequence) location.href = url;
         }
     }
 
-    // Wrap navigation in a view transition
-    function navigate(url, push) {
-        return document.startViewTransition(() => swapPage(url, push));
-    }
-
-    // Intercept eligible clicks
-    document.addEventListener('click', function (event) {
-        var link = event.target.closest('a');
-        if (!shouldHandleLink(link, event))
+    // Intercept ordinary same-origin page links while preserving native browser actions
+    document.addEventListener('click', (event) => {
+        const link = event.target.closest('a');
+        if (
+            !link ||
+            event.defaultPrevented ||
+            event.button !== 0 ||
+            event.metaKey ||
+            event.ctrlKey ||
+            event.shiftKey ||
+            event.altKey ||
+            (link.target && link.target !== '_self') ||
+            link.hasAttribute('download') ||
+            link.hasAttribute('data-no-view-transition')
+        )
+            return;
+        const url = new URL(link.href);
+        if (
+            url.origin !== location.origin ||
+            !['http:', 'https:'].includes(url.protocol) ||
+            url.pathname === location.pathname ||
+            !document.startViewTransition
+        )
             return;
         event.preventDefault();
-        navigate(link.href, true);
+        capture();
+        navigate(url.href, true);
     });
-
-    // Handle back/forward navigation; ignore hash changes
-    window.addEventListener('popstate', function () {
-        const newPath = window.location.pathname + window.location.search;
-        if (newPath === currentPath)
-            return;
-        currentPath = newPath;
-        navigate(window.location.href, false);
+    // Restore the scroll position belonging to the destination history entry
+    addEventListener('popstate', (event) => {
+        const next = location.pathname + location.search,
+            target = event.state?.flux_entry;
+        if (path !== next) navigate(location.href, false, target);
+        else if (target && target !== entry) {
+            capture();
+            entry = target;
+            position(Flux.manifest, positions.get(entry), sequence);
+        }
     });
 })();

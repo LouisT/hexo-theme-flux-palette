@@ -1,12 +1,29 @@
 <% if (theme.comments && theme.comments.enabled) { %>
 <hr />
-<div class="comments-section">
-  <% if (theme.comments.service === 'giscus' && theme.comments.giscus) { %>
-  <script src="https://giscus.app/client.js" data-repo="<%= theme.comments.giscus.repo %>" data-repo-id="<%= theme.comments.giscus.repo_id %>" data-category="<%= theme.comments.giscus.category %>" data-category-id="<%= theme.comments.giscus.category_id %>" data-mapping="<%= theme.comments.giscus.mapping %>" data-reactions-enabled="<%= theme.comments.giscus.reactions_enabled %>" data-emit-metadata="<%= theme.comments.giscus.emit_metadata %>" data-input-position="<%= theme.comments.giscus.input_position %>" data-theme="<%= theme.comments.giscus.theme %>" data-lang="<%= theme.comments.giscus.lang %>" crossorigin="anonymous" async>
+<div class="comments-section" x-data="commentTheme">
+    <p x-show="offline" role="status" x-cloak>Comments require an internet connection.</p>
+    <% if (theme.comments.service === 'giscus' && theme.comments.giscus) { %>
+    <template data-comment-script>
+        <script src="https://giscus.app/client.js" data-repo="<%= theme.comments.giscus.repo %>"
+            data-repo-id="<%= theme.comments.giscus.repo_id %>"
+            data-category="<%= theme.comments.giscus.category %>"
+            data-category-id="<%= theme.comments.giscus.category_id %>"
+            data-mapping="<%= theme.comments.giscus.mapping %>"
+            data-reactions-enabled="<%= theme.comments.giscus.reactions_enabled %>"
+            data-emit-metadata="<%= theme.comments.giscus.emit_metadata %>"
+            data-input-position="<%= theme.comments.giscus.input_position %>"
+            data-theme="<%= theme.comments.giscus.theme %>"
+            data-lang="<%= theme.comments.giscus.lang %>" crossorigin="anonymous" async>
   </script>
-  <% } else if (theme.comments.service === 'utterances' && theme.comments.utterances) { %>
-  <script src="https://utteranc.es/client.js" repo="<%= theme.comments.utterances.repo %>" issue-term="<%= theme.comments.utterances.issue_term %>" label="<%= theme.comments.utterances.label %>" theme="<%= theme.comments.utterances.theme %>" crossorigin="anonymous" async>
+    </template>
+    <% } else if (theme.comments.service === 'utterances' && theme.comments.utterances) { %>
+    <template data-comment-script>
+        <script src="https://utteranc.es/client.js" repo="<%= theme.comments.utterances.repo %>"
+            issue-term="<%= theme.comments.utterances.issue_term %>"
+            label="<%= theme.comments.utterances.label %>"
+            theme="<%= theme.comments.utterances.theme %>" crossorigin="anonymous" async>
   </script>
-  <% } %>
+    </template>
+    <% } %>
 </div>
 <% } %>

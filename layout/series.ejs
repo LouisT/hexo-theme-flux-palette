@@ -1,0 +1,22 @@
+<section class="post-index series-page">
+    <h1 class="page-title"><%= page.title %></h1>
+    <% if (page.series_group) { var group = page.series_group; %>
+    <% if (group.description) { %><p><%= group.description %></p><% } %>
+    <ol class="series-chapters">
+        <% group.chapters.forEach(function(chapter) { %>
+        <li><a href="<%= chapter.url %>"><%= chapter.title %></a><% if (chapter.encrypted) { %>
+            🔒<% } %><p><%= chapter.excerpt %></p>
+        </li>
+        <% }); %>
+    </ol>
+    <a href="<%= url_for('/series/') %>">All series</a>
+    <% } else { %>
+    <% page.series_list.forEach(function(group) { %>
+    <article class="post-card">
+        <h2><a href="<%= group.url %>"><%= group.title %></a></h2>
+        <p><%= group.description %></p>
+        <p><%= group.chapters.length %> chapters</p>
+    </article>
+    <% }); %>
+    <% } %>
+</section>

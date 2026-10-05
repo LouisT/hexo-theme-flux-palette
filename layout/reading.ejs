@@ -1,0 +1,25 @@
+<section class="post-index" x-data="readingLibrary">
+    <h1 class="page-title">Reading list</h1>
+    <p x-show="!items.length">Bookmark an article to add it here. This list is stored in this
+        browser.</p>
+    <template x-for="item in items" :key="item.url">
+        <article class="post-card">
+            <h2><a :href="item.url" x-text="item.title"></a><span x-show="item.encrypted"> 🔒</span>
+            </h2>
+            <p x-text="progress(item)"></p><button type="button" @click="remove(item.url)">Remove
+                bookmark</button>
+        </article>
+    </template>
+    <% if (theme.offline?.enabled) { %>
+    <h2>Offline downloads</h2>
+    <p x-show="!downloads.length">No downloaded articles.</p>
+    <template x-for="item in downloads" :key="item.url">
+        <article class="post-card">
+            <h3><a :href="item.url" x-text="item.title"></a></h3><button type="button"
+                @click="removeDownload(item.url)">Remove download</button>
+        </article>
+    </template>
+    <button type="button" x-show="downloads.length" @click="clearDownloads">Clear downloads</button>
+    <p role="status" x-text="message"></p>
+    <% } %>
+</section>

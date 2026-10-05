@@ -1,17 +1,14 @@
-document.addEventListener('alpine:init', () => {
-    Alpine.data('sidebarSection', (id) => {
-        const key = `flux-sidebar-${id}`,
-            stored = sessionStorage.getItem(key),
-            initialOpen = stored === null ? true : (stored === 'true');
-        return {
-            id: id,
-            open: initialOpen,
-            init() {
-                this.$watch('open', val => sessionStorage.setItem(key, val));
-            },
-            toggle() {
-                this.open = !this.open;
-            }
-        };
-    });
+window.Flux.register('sidebar', () => {
+    Alpine.data('sidebarSection', (id) => ({
+        id,
+        open: Flux.read('sidebar-' + id, true),
+        // Persist disclosure state independently for each sidebar section
+        init() {
+            this.$watch('open', (value) => Flux.write('sidebar-' + id, value));
+        },
+        // Toggle the responsive sidebar from its navigation control
+        toggle() {
+            this.open = !this.open;
+        },
+    }));
 });

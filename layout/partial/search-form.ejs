@@ -1,0 +1,93 @@
+<% var frontend = page.flux_playground ? {mode:'local',debounce:3000,index_path:'playground/search/'} : flux_search_config(), hasSearchBookmarks = theme.reading?.enabled !== false && !page.flux_playground; %>
+<section class="search-page" x-data='search(<%- flux_json(frontend) %>)' @keydown="keydown($event)">
+    <label for="flux-search-query">Keywords</label>
+    <div class="search-box"><input id="flux-search-query" type="search" x-model="query"
+            x-ref="searchInput" autocomplete="off"><button type="button" @click="clearSearch">Clear
+            search</button></div>
+    <div class="flux-filters">
+        <label>Type<select aria-label="Type" x-model="type">
+                <option value="">All content</option>
+                <option value="post">Posts</option>
+                <option value="project">Projects</option>
+            </select></label>
+        <label>Tag<select aria-label="Tag" x-model="tag">
+                <option value="">All tags</option><template x-for="t in tags" :key="t">
+                    <option :value="t" :selected="tag === t" x-text="t"></option>
+                </template>
+            </select></label>
+        <label>Category<select aria-label="Category" x-model="category">
+                <option value="">All categories</option><template x-for="c in categories" :key="c">
+                    <option :value="c" :selected="category === c" x-text="c"></option>
+                </template>
+            </select></label>
+        <label>From<input type="date" x-model="from"></label><label>Through<input type="date"
+                x-model="to"></label>
+        <button type="button" @click="clearFilters" x-show="hasFilters">Clear filters</button>
+    </div>
+    <div class="search-status" role="status" aria-live="polite">
+        <span class="search-spinner" x-show="isBusy" aria-hidden="true" x-cloak></span>
+        <span
+            x-text="catalogLoading ? 'Loading search…' : isLoading ? 'Searching…' : isWaiting ? 'Waiting for typing to finish…' : error || (query || hasFilters ? resultCount : 'Enter keywords or choose a filter.')"></span>
+    </div>
+    <button type="button" x-show="error" @click="retry">Retry search</button>
+    <section class="search-recent" aria-labelledby="flux-search-recent-title"
+        x-show="!query.trim() && recent.length" x-cloak>
+        <div class="search-recent-header">
+            <h2 id="flux-search-recent-title" class="search-recent-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"
+                    aria-hidden="true">
+                    <path d="M3 11a9 9 0 1 1 2.6 7.4M3 4v7h7M12 7v5l3 2" />
+                </svg>
+                Recent searches
+            </h2>
+            <button class="search-history-clear" type="button" @click="clearRecent">Clear
+                history</button>
+        </div>
+        <ul class="search-recent-list" role="list"><template x-for="q in recent" :key="q">
+                <li><button class="search-recent-query" type="button" @click="query = q"
+                        x-text="q"></button></li>
+            </template></ul>
+    </section>
+    <div class="search-results" :aria-busy="isBusy ? 'true' : 'false'">
+        <template x-for="result in results" :key="result.id">
+            <article
+                class="post-card search-result<%= hasSearchBookmarks ? ' bookmark-card' : '' %>">
+                <% if (hasSearchBookmarks) { %>
+                <%- partial('partial/card-bookmark', {dynamic: true}) %>
+                <% } %>
+                <h2 class="post-title"><a :href="result.url"
+                        x-html="highlight(result.title)"></a><template x-if="result.encrypted">
+                        <%- partial('partial/lock') %>
+                    </template></h2>
+                <div class="post-meta"><time :datetime="result.date"
+                        x-text="result.day || result.date.slice(0,10)"></time>
+                    <span class="meta-sep">-</span><span
+                        x-text="result.type === 'project' ? 'Project' : 'Post'"></span>
+                    <span class="meta-sep" x-show="result.categories.length">-</span>
+                    <span class="search-categories"><template x-for="(c, i) in result.categories"
+                            :key="c"><span><a :href="topicUrl(result, c, 'category')"
+                                    x-html="highlight(c)"></a><span
+                                    x-text="i < result.categories.length - 1 ? ', ' : ''"></span></span></template></span>
+                </div>
+                <div class="post-excerpt" x-html="highlight(result.excerpt)"></div>
+                <div class="post-tags search-topics" x-show="result.tags.length">Tags:
+                    <template x-for="(t, i) in result.tags" :key="t"><span><a
+                                :href="topicUrl(result, t)" x-html="highlight(t)"></a><span
+                                x-text="i < result.tags.length - 1 ? ', ' : ''"></span></span></template>
+                </div>
+                <div class="post-meta-bottom">
+                    <a class="post-btn" :href="result.url">Read more</a>
+                </div>
+            </article>
+        </template>
+        <p x-show="(query || hasFilters) && !matches.length && !isBusy && !error" x-cloak>No
+            results found.</p>
+        <div class="search-suggestions" x-show="suggestions.length"><span>Try:</span><template
+                x-for="q in suggestions" :key="q"><button type="button" @click="query = q"
+                    x-text="q"></button></template>
+        </div>
+        <button type="button" @click="loadMore"
+            x-show="results.length < matches.length && !isBusy">Load more</button>
+    </div>
+</section>

@@ -1,0 +1,55 @@
+<% var projectList = projects || [], filters = theme.projects?.filters?.enabled !== false, perPage = page.pagination_per_page ?? theme.projects?.per_page ?? config.index_generator?.per_page ?? config.per_page ?? 10, paging = page.pagination_base ? page : {current: page.current || 1, total: perPage > 0 ? Math.ceil(projectList.length / perPage) : 1, pagination_base: 'projects/'}, hasCardBookmarks = theme.reading?.enabled !== false && !page.flux_playground; %>
+<section class="projects-page post-index" <% if (filters) { %>x-data="projectFilters"
+    data-per-page="<%= perPage > 0 ? perPage : projectList.length %>"
+    data-current="<%= page.current || 1 %>"
+    data-pagination-base="<%= page.pagination_base ? url_for(page.pagination_base) : '' %>" <% } %>>
+    <% if(page.flux_playground) { %><h2 class="page-title">Portfolio filters</h2><% } else { %><h1
+        class="page-title"><%= title || theme.projects?.title || 'Projects' %></h1><% } %>
+    <% if (filters) { %><div class="flux-filters">
+        <label>Technology<select aria-label="Technology" x-model="tag">
+                <option value="">All tags</option><template x-for="t in tags">
+                    <option :value="t" :selected="tag === t" x-text="t"></option>
+                </template>
+            </select></label>
+        <label>Category<select aria-label="Category" x-model="category">
+                <option value="">All categories</option><template x-for="c in categories">
+                    <option :value="c" :selected="category === c" x-text="c"></option>
+                </template>
+            </select></label>
+        <label>Status<select aria-label="Status" x-model="status">
+                <option value="">All statuses</option><template x-for="s in statuses">
+                    <option :value="s" :selected="status === s" x-text="s"></option>
+                </template>
+            </select></label><button type="button" @click="clear">Clear filters</button>
+    </div>
+    <p role="status" x-text="total + ' projects'"></p><% } %>
+    <% projectList.forEach(function(project, index) { %>
+    <article class="post-card project-card<%= hasCardBookmarks ? ' bookmark-card' : '' %>"
+        <% if(project.flux_sample) { %>id="<%= project.slug %>" <% } %> data-project-card
+        data-tags='<%- flux_json(project.project_tags || []) %>'
+        data-category="<%= project.project_category || '' %>"
+        data-status="<%= project.project_status || '' %>"
+        <% if (filters && perPage > 0 && (index < ((page.current || 1)-1)*perPage || index >= (page.current || 1)*perPage)) { %>hidden<% } %>>
+        <% if (hasCardBookmarks) { %>
+        <%- partial('partial/card-bookmark', {item: project, type: 'project'}) %>
+        <% } %>
+        <h2 class="post-title"><a
+                href="<%= url_for(project.path) %>"><%= project.title %></a><% if(project.encrypted || project.password) { %>
+            🔒<% } %></h2>
+        <div class="post-meta"><time
+                datetime="<%= date_xml(project.date) %>"><%= date(project.date) %></time><% if(project.project_status) { %>
+            · <%= project.project_status %><% } %></div>
+        <p><%= project.encrypted || project.password ? 'This content has been password protected.' : strip_html(project.project_summary || project.excerpt || project.content || '').slice(0,220) %>
+        </p>
+        <div class="post-tags">
+            <% (project.project_tags || []).forEach(function(tag) { %><% if(project.flux_sample) { %><span><%= tag %></span>
+            <% } else { %><a href="<%= project_tag_url(tag) %>"><%= tag %></a> <% } %><% }); %>
+        </div>
+        <nav><a class="post-btn" href="<%= url_for(project.path) %>">Read
+                more</a><% (project.buttons || []).forEach(function(b) { %> <a class="post-btn"
+                href="<%= b.url %>" target="_blank"
+                rel="noopener"><%= b.text || b.name %></a><% }); %></nav>
+    </article><% }); %>
+    <%- partial('partial/pagination', {pagination: paging, label: 'Project pages', dynamic: filters}) %>
+    <% if(!projectList.length) { %><p>No projects have been defined yet.</p><% } %>
+</section>

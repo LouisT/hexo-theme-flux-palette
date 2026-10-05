@@ -1,0 +1,83 @@
+<% var article = flux_article(), hasReading = theme.reading?.enabled !== false, hasLock = article.encrypted, hasOffline = theme.offline?.enabled && !hasLock && !page.flux_playground; %>
+<% if (hasReading || hasOffline || hasLock) { %>
+<div class="article-tools" role="group" aria-label="Article tools">
+    <% if (hasReading) { %>
+    <div class="reading-toolbar" x-data="readingTools">
+        <button type="button" class="reading-action bookmark-action" @click="toggle"
+            :aria-pressed="saved" :aria-label="saved ? 'Remove bookmark' : 'Bookmark'">
+            <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="1.7">
+                <path d="M6 4h12v17l-6-4-6 4z" />
+            </svg>
+            <span x-text="saved ? 'Bookmarked' : 'Bookmark'">Bookmark</span>
+        </button>
+        <button type="button" class="reading-action" @click="resume" x-show="canResume"
+            x-cloak>Resume reading</button>
+        <details class="reading-preferences" x-ref="preferences" x-id="['reading-preferences']"
+            @toggle="prefsOpen = $el.open" @click.outside="closePreferences(false)"
+            @focusout="if ($event.relatedTarget && !$el.contains($event.relatedTarget)) closePreferences(false)"
+            @keydown.escape.prevent.stop="closePreferences()">
+            <summary :aria-expanded="prefsOpen" :aria-controls="$id('reading-preferences')">
+                <span class="reading-type-icon" aria-hidden="true">Aa</span><span>Reading
+                    preferences</span>
+                <svg class="control-caret" aria-hidden="true" width="12" height="12"
+                    viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="m3 4.5 3 3 3-3" />
+                </svg>
+            </summary>
+            <div class="reading-preferences-panel" :id="$id('reading-preferences')" role="group"
+                aria-label="Text appearance">
+                <div class="reading-preferences-header"><strong>Text appearance</strong><button
+                        type="button" class="reading-reset" @click="reset"
+                        aria-label="Reset preferences">Reset</button></div>
+                <div class="reading-preferences-fields">
+                    <label>Font size<select x-model.number="prefs.size">
+                            <option value="90">90%</option>
+                            <option value="100">100%</option>
+                            <option value="110">110%</option>
+                            <option value="125">125%</option>
+                            <option value="150">150%</option>
+                        </select></label>
+                    <label>Line spacing<select x-model.number="prefs.spacing">
+                            <option value="1.4">Compact</option>
+                            <option value="1.6">Standard</option>
+                            <option value="1.8">Relaxed</option>
+                            <option value="2">Spacious</option>
+                        </select></label>
+                    <label>Content width<select x-model="prefs.width">
+                            <option value="auto">Automatic</option>
+                            <option value="60ch">Narrow</option>
+                            <option value="75ch">Standard</option>
+                            <option value="90ch">Wide</option>
+                        </select></label>
+                </div>
+                <p class="reading-preferences-status" role="status" x-text="prefsMessage"></p>
+            </div>
+        </details>
+        <span class="sr-only" role="status" x-text="message"></span>
+    </div>
+    <% } %>
+    <% if (hasOffline) { %>
+    <div class="offline-controls" x-data="offlineArticle"><button type="button" @click="save"
+            :disabled="busy" class="reading-action">Save offline</button><button type="button"
+            @click="remove" x-show="saved" x-cloak :disabled="busy" class="reading-action">Remove
+            download</button>
+        <span class="offline-status" role="status" x-text="message" x-show="message"></span>
+    </div>
+    <% } %>
+    <% if (hasLock) { %>
+    <button type="button" class="reading-action article-lock" x-data="articleLock" x-cloak
+        @click="toggle" :disabled="busy" :aria-expanded="unlocked"
+        :aria-label="unlocked ? 'Lock again' : 'Unlock content'"
+        :title="unlocked ? 'Lock again' : 'Unlock content'">
+        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="5" y="10" width="14" height="11" rx="2" />
+            <path x-show="!unlocked" d="M8 10V6a4 4 0 0 1 8 0v4" />
+            <path x-show="unlocked" d="M8 10V6a4 4 0 0 1 7.5-2" />
+            <path d="M12 15v2" />
+        </svg>
+    </button>
+    <% } %>
+</div>
+<% } %>

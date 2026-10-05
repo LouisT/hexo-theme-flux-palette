@@ -1,0 +1,16 @@
+<% var dynamicItem = typeof dynamic !== 'undefined' && dynamic; %>
+<div class="card-bookmark"
+    x-data="<%= dynamicItem ? 'cardBookmark({title: result.title, url: result.url, type: result.type, encrypted: !!result.encrypted})' : 'cardBookmark' %>"
+    <% if (!dynamicItem) { %> data-bookmark='<%- flux_json(flux_bookmark(item, type)) %>' <% } %>>
+    <button class="bookmark-action card-bookmark-button" type="button" x-cloak disabled
+        :disabled="false" @click="toggle" aria-pressed="false" :aria-pressed="saved"
+        aria-label="<%= dynamicItem ? 'Bookmark' : 'Bookmark ' + item.title %>"
+        :aria-label="(saved ? 'Remove bookmark for ' : 'Bookmark ') + article.title"
+        :title="saved ? 'Remove bookmark' : 'Bookmark'">
+        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="1.7">
+            <path d="M6 4h12v17l-6-4-6 4z" />
+        </svg>
+    </button>
+    <span class="sr-only" role="status" x-text="message"></span>
+</div>

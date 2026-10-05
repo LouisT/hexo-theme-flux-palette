@@ -1,50 +1,92 @@
-<section class="post-index cloud-page">
-  <h1 class="page-title"><%= page.title || 'Cloud' %></h1>
+<% var sections = [
+    {key: 'categories', title: page.categories_title || 'Categories', items: page.categories || []},
+    {key: 'tags', title: page.tags_title || 'Tags', items: page.tags || []}
+].filter(function(section) { return section.items.length; }), controls = page.cloud_controls === true && sections.length > 0; %>
+<section class="post-index cloud-page" <% if (controls) { %>x-data="cloudExplorer"
+    data-sort="<%= page.cloud_sort %>" <% } %>>
+    <header class="cloud-header">
+        <h1 class="page-title"><%= page.title || 'Cloud' %></h1>
+        <p class="cloud-intro">
+            <%= sections.length === 2 ? 'Explore articles by category, or follow a tag to find your next read.' : sections.length ? 'Explore articles by ' + (sections[0].key === 'categories' ? 'category.' : 'tag.') : 'Explore topics across the blog.' %>
+        </p>
+        <% if (sections.length) { %>
+        <ul class="cloud-totals" aria-label="Available topics" role="list">
+            <% sections.forEach(function(section) { %>
+            <li><strong><%= section.items.length %></strong>
+                <%= section.key === 'categories' ? (section.items.length === 1 ? 'category' : 'categories') : (section.items.length === 1 ? 'tag' : 'tags') %>
+            </li>
+            <% }); %>
+        </ul>
+        <% } %>
+    </header>
 
-  <% var hasCategories = page.categories && page.categories.length; %>
-  <% var hasTags = page.tags && page.tags.length; %>
-
-  <% if (hasCategories) { %>
-  <section class="cloud-section">
-    <h2 class="cloud-section-title"><%= page.categories_title || 'Categories' %></h2>
-    <p class="cloud-summary">
-      <%= page.categories.length %> categories
-    </p>
-
-    <div class="cloud-list" role="list" aria-label="Category cloud">
-      <% page.categories.forEach(function(category) { %>
-      <a class="cloud-item" role="listitem" href="<%= url_for(category.path) %>" style="font-size:<%= category.size %>rem; --cloud-weight:<%= category.weight %>; --cloud-opacity:<%= category.opacity %>;" title="<%= category.name %> (<%= category.count %>)">
-        <span class="cloud-name"><%= category.name %></span>
-        <span class="cloud-count"><%= category.count %></span>
-      </a>
-      <% }); %>
+    <% if (controls) { %>
+    <div class="cloud-toolbar" hidden :hidden="!enhanced">
+        <label>Find a topic
+            <input type="search" x-ref="query" x-model="query"
+                placeholder="<%= sections.length === 2 ? 'Filter categories and tags' : 'Filter ' + sections[0].key %>"
+                autocomplete="off" spellcheck="false">
+        </label>
+        <label>Sort topics
+            <select x-model="sort">
+                <% [['count:desc', 'Most used'], ['count:asc', 'Least used'], ['name:asc', 'A-Z'], ['name:desc', 'Z-A']].forEach(function(option) { %>
+                <option value="<%= option[0] %>"
+                    <%= page.cloud_sort === option[0] ? 'selected' : '' %>><%= option[1] %></option>
+                <% }); %>
+            </select>
+        </label>
+        <button type="button" @click="clear" :disabled="!query.length">Clear search</button>
     </div>
-  </section>
-  <% } %>
+    <p class="sr-only" role="status" aria-live="polite" aria-atomic="true" hidden
+        :hidden="!enhanced" x-text="status"></p>
+    <% } %>
 
-  <% if (hasCategories && hasTags) { %>
-  <hr class="cloud-break" aria-hidden="true">
-  <% } %>
+    <% sections.forEach(function(section) { var categories = section.key === 'categories'; %>
+    <section class="cloud-section" aria-labelledby="cloud-<%= section.key %>-title">
+        <div class="cloud-section-heading">
+            <h2 id="cloud-<%= section.key %>-title"><%= section.title %></h2>
+            <p class="cloud-summary" <% if (controls) { %>x-text="summary('<%= section.key %>')"
+                <% } %>>
+                <%= section.items.length %>
+                <%= categories ? (section.items.length === 1 ? 'category' : 'categories') : (section.items.length === 1 ? 'tag' : 'tags') %>
+            </p>
+        </div>
+        <ul class="<%= categories ? 'cloud-category-grid' : 'cloud-list' %>" role="list"
+            data-cloud-list="<%= section.key %>">
+            <% section.items.forEach(function(item) { %>
+            <li data-name="<%= item.name %>" data-count="<%= item.count %>">
+                <a class="<%= categories ? 'cloud-category-card' : 'cloud-item' %>"
+                    href="<%= url_for(item.path) %>"
+                    <% if (!categories) { %>style="font-size:<%= item.size %>rem; --cloud-weight:<%= item.weight %>;"
+                    <% } %>>
+                    <span class="cloud-name"><%= item.name %></span>
+                    <% if (categories) { %>
+                    <span class="cloud-category-meta">
+                        <span class="cloud-count"><%= item.count %></span>
+                        <span><%= item.count === 1 ? 'article' : 'articles' %></span>
+                        <svg class="cloud-arrow" aria-hidden="true" width="20" height="20"
+                            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M5 12h14m-6-6 6 6-6 6" />
+                        </svg>
+                    </span>
+                    <% } else { %>
+                    <span class="cloud-count"><%= item.count %><span class="sr-only">
+                            <%= item.count === 1 ? 'article' : 'articles' %></span></span>
+                    <% } %>
+                </a>
+            </li>
+            <% }); %>
+        </ul>
+        <% if (controls) { %>
+        <p class="cloud-empty" hidden :hidden="!enhanced || visible('<%= section.key %>') > 0">
+            No matching <%= section.key %>. Try another topic or clear your search.
+        </p>
+        <% } %>
+    </section>
+    <% }); %>
 
-  <% if (hasTags) { %>
-  <section class="cloud-section">
-    <h2 class="cloud-section-title"><%= page.tags_title || 'Tags' %></h2>
-    <p class="cloud-summary">
-      <%= page.tags.length %> tags
-    </p>
-
-    <div class="cloud-list" role="list" aria-label="Tag cloud">
-      <% page.tags.forEach(function(tag) { %>
-      <a class="cloud-item" role="listitem" href="<%= url_for(tag.path) %>" style="font-size:<%= tag.size %>rem; --cloud-weight:<%= tag.weight %>; --cloud-opacity:<%= tag.opacity %>;" title="<%= tag.name %> (<%= tag.count %>)">
-        <span class="cloud-name"><%= tag.name %></span>
-        <span class="cloud-count"><%= tag.count %></span>
-      </a>
-      <% }); %>
-    </div>
-  </section>
-  <% } %>
-
-  <% if (!hasCategories && !hasTags) { %>
-  <p>No categories or tags are available yet.</p>
-  <% } %>
+    <% if (!sections.length) { %>
+    <p class="cloud-section cloud-empty">No categories or tags are available yet.</p>
+    <% } %>
 </section>

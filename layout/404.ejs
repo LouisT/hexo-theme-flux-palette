@@ -1,16 +1,31 @@
 <article class="post-single post-404">
-  <h1 class="post-title">404 - Not Found</h1>
-  <div class="post-meta">
-    <span>Looks like this page doesn't exist.</span>
-  </div>
-  <div class="post-content">
-    <p>
-      The URL you followed doesn't point to anything here.
-      If you were trying a short link, double-check the hash,
-      or head back to the home page.
-    </p>
-    <p>
-      <a href="<%= url_for('/') %>" class="post-btn">Back to Home</a>
-    </p>
-  </div>
+    <header class="not-found-header">
+        <span class="not-found-code" aria-hidden="true">404</span>
+        <div>
+            <h1 class="post-title">Page not found<span class="sr-only"> (404)</span></h1>
+            <p class="not-found-description">The page may have moved, or the link may be out of
+                date.</p>
+        </div>
+    </header>
+    <nav class="not-found-actions" aria-label="Find another page">
+        <a href="<%= url_for('/') %>" class="post-btn">Back to home</a>
+        <a href="<%= url_for('/blog/') %>" class="post-btn">Browse the blog</a>
+    </nav>
+    <% if (theme.search?.enabled !== false) { %>
+    <form class="not-found-search" method="get" action="<%= url_for('/search/') %>" role="search">
+        <label for="not-found-query">Search the site</label>
+        <div class="search-box">
+            <input id="not-found-query" name="q" type="search"
+                placeholder="Search posts and projects" autocomplete="off">
+            <button type="submit">
+                <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+                    <circle cx="10.5" cy="10.5" r="6.5" />
+                    <path d="m16 16 4 4" />
+                </svg>
+                Search
+            </button>
+        </div>
+    </form>
+    <% } %>
 </article>

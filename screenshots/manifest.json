@@ -1,0 +1,49 @@
+{
+    "viewport": {
+        "width": 1440,
+        "height": 1000
+    },
+    "fullPage": false,
+    "screenshots": [
+        {
+            "title": "Homepage",
+            "url": "/",
+            "file": "homepage.png"
+        },
+        {
+            "title": "Blog",
+            "url": "/blog/",
+            "file": "blog.png"
+        },
+        {
+            "title": "Projects",
+            "url": "/projects/",
+            "file": "projects.png"
+        },
+        {
+            "title": "Project details",
+            "url": "/projects/flux-palette/",
+            "file": "project-details.png"
+        },
+        {
+            "title": "Blog post",
+            "url": "/2026/01/01/demo-rich-content/",
+            "file": "blog-post.png"
+        },
+        {
+            "title": "Topic cloud",
+            "url": "/cloud/",
+            "file": "topic-cloud.png"
+        },
+        {
+            "title": "Search",
+            "url": "/search/",
+            "file": "search.png"
+        },
+        {
+            "title": "Reading list",
+            "url": "/reading/",
+            "file": "reading-list.png"
+        }
+    ]
+}

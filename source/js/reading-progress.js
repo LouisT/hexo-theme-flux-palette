@@ -1,34 +1,35 @@
-document.addEventListener('alpine:init', () => {
+window.Flux.register('reading-progress', () => {
     Alpine.data('readingProgress', () => ({
         progress: 0,
+        // Coalesce scroll and resize updates into a single animation frame
         init() {
-            // Bind the update function to 'this' to preserve context
-            this.handleScroll = this.updateProgress.bind(this);
-
-            // Add listeners directly to window
-            document?.body?.addEventListener?.('scroll', this.handleScroll, { passive: true });
-            window.addEventListener('resize', this.handleScroll, { passive: true });
-
-            // Trigger once on load
+            this.update = () => {
+                cancelAnimationFrame(this.frame);
+                this.frame = requestAnimationFrame(() => this.updateProgress());
+            };
+            document.addEventListener('scroll', this.update, true);
+            addEventListener('resize', this.update);
             this.updateProgress();
         },
+        // Clamp progress to the portion of article content that has entered the viewport
         updateProgress() {
             const el = this.$refs.content;
-            if (!el)
-                return;
-
-            // Get current scroll position
-            const rect = el.getBoundingClientRect(),
-                windowHeight = window.innerHeight || document.documentElement.clientHeight,
-                scrollTop = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
-
-            // Calculate progress
-            const offsetTop = rect.top + scrollTop,
-                current = scrollTop + windowHeight - offsetTop,
-                percent = (current / rect.height) * 100;
-
-            // Update progress
-            this.progress = Math.min(100, Math.max(0, percent));
-        }
+            if (!el) return;
+            this.progress = Math.max(
+                0,
+                Math.min(
+                    100,
+                    ((innerHeight - el.getBoundingClientRect().top) /
+                        Math.max(1, el.offsetHeight)) *
+                        100
+                )
+            );
+        },
+        // Cancel pending frames and remove progress listeners on navigation
+        destroy() {
+            cancelAnimationFrame(this.frame);
+            document.removeEventListener('scroll', this.update, true);
+            removeEventListener('resize', this.update);
+        },
     }));
 });

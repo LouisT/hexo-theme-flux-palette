@@ -1,42 +1,51 @@
-document.addEventListener('alpine:init', () => {
+window.Flux.register('code-copy', () => {
     Alpine.data('codeCopy', () => ({
         copied: false,
+        alive: true,
+        // Copy code text and ignore clipboard feedback after the component leaves
         async copy() {
-            // Find the <code> element within Hexo's table structure
-            // Hexo structure: figure.highlight -> table -> td.code -> pre
+            // Read code from the Hexo highlight table without including line numbers
             const figure = this.$el.closest('.highlight'),
                 codeElement = figure ? figure.querySelector('td.code pre') : null;
             if (codeElement)
                 try {
                     // writeText is supported in modern secure contexts
                     await navigator.clipboard.writeText(codeElement.innerText);
+                    if (!this.alive) return;
                     this.copied = true;
-                    setTimeout(() => this.copied = false, 2000);
+                    clearTimeout(this.timer);
+                    this.timer = setTimeout(() => (this.copied = false), 2000);
                 } catch (err) {
                     console.error('Failed to copy: ', err);
                 }
-        }
+        },
+        // Discard clipboard feedback and clear its timer after navigation
+        destroy() {
+            this.alive = false;
+            clearTimeout(this.timer);
+        },
     }));
     Alpine.data('codeImage', () => ({
+        alive: true,
+        // Render the highlighted code table through SVG into a downloadable PNG
         async capture() {
-            // Find the <code> element within Hexo's table structure
+            // Read the highlighted table used for code image export
             const figure = this.$el.closest('.highlight'),
                 table = figure.querySelector('table');
-            if (!table)
-                return;
+            if (!table) return;
 
-            // Get theme-specific styles
+            // Read the active palette and highlighted code typography
             const styles = window.getComputedStyle(figure),
                 root = window.getComputedStyle(document.documentElement),
                 padding = 24;
 
-            // Measure the table and add padding
-            const width = table.offsetWidth + (padding * 2),
-                height = table.offsetHeight + (padding * 2);
+            // Reserve padding around the measured code table
+            const width = table.offsetWidth + padding * 2,
+                height = table.offsetHeight + padding * 2;
 
-            // Map all theme-specific highlighting variables
+            // Embed the active syntax highlighting colors in the exported SVG
             const themeStyles = `
-            .highlight { color: ${styles.color}; font-family: ${styles.fontFamily}; font-size: ${styles.fontSize}; background: ${styles.backgroundColor}; padding: ${padding}px; border-radius: 8px; }
+            .highlight { color: ${styles.color}; font-family: ${styles.fontFamily}; font-size: ${styles.fontSize}; background: ${styles.backgroundColor}; padding: ${padding}px; border-radius: 0; }
             .gutter { padding-right: 1.5rem; color: ${root.getPropertyValue('--muted')}; opacity: 0.5; text-align: right; border-right: 1px solid ${root.getPropertyValue('--border-code')}; user-select: none; }
             .code { padding-left: 1.5rem; }
             .comment, .quote, .doctag { color: ${root.getPropertyValue('--hl-comment')}; font-style: italic; }
@@ -53,12 +62,17 @@ document.addEventListener('alpine:init', () => {
             pre { margin: 0; white-space: pre-wrap; font-family: inherit; line-height: 1.5; }
             table { border-collapse: collapse; width: 100%; }`;
 
-            // Convert the table HTML to XML (DOM -> XML)
+            // Serialize the code table as XML for embedding in SVG
             const contentHtml = new XMLSerializer().serializeToString(table);
 
-            // Generate the SVG, draw to image (XML -> SVG)
+            // Load a styled SVG containing the serialized code table
             const img = new Image();
-            img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent( `
+            if (this.image) {
+                this.image.onload = null;
+                this.image.src = '';
+            }
+            this.image = img;
+            img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`
             <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
                 <foreignObject width="100%" height="100%">
                     <div xmlns="http://www.w3.org/1999/xhtml" style="height:100%; width:100%;">
@@ -72,23 +86,34 @@ document.addEventListener('alpine:init', () => {
                 </foreignObject>
             </svg>`)}`;
 
-            // Create the canvas to write the SVG
+            // Allocate a canvas matching the padded code image dimensions
             const canvas = document.createElement('canvas'),
                 ctx = canvas.getContext('2d');
             canvas.width = width;
             canvas.height = height;
 
-            // Wait for the image to load
+            // Export only after the SVG image finishes loading
             img.onload = () => {
-                // Draw the SVG to the canvas (SVG -> PNG)
+                if (!this.alive) return;
+                // Rasterize the loaded SVG before exporting PNG bytes
                 ctx.drawImage(img, 0, 0);
 
-                // Download the PNG
+                // Trigger a PNG download from the rasterized code table
                 const link = document.createElement('a');
                 link.download = `code-flux-${Date.now()}.png`;
                 link.href = canvas.toDataURL('image/png');
                 link.click();
+                img.onload = null;
             };
-        }
+        },
+        // Cancel image callbacks and release the pending code capture on navigation
+        destroy() {
+            this.alive = false;
+            if (this.image) {
+                this.image.onload = null;
+                this.image.src = '';
+                this.image = null;
+            }
+        },
     }));
 });

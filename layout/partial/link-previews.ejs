@@ -1,5 +1,5 @@
-<div x-data="linkPreview" x-show="show" x-transition.opacity class="link-preview-tooltip" :style="`left: ${pos.x}px; top: ${pos.y}px;`" x-cloak>
-  <strong x-text="title"></strong>
-  <p x-text="summary"></p>
+<div x-data="linkPreview" x-show="show" x-transition.opacity class="link-preview-tooltip"
+    :style="{ left: pos.x + 'px', top: pos.y + 'px' }" x-cloak>
+    <strong x-text="title"></strong>
+    <p x-text="summary"></p>
 </div>
-<script src="<%= url_for('/js/link-previews.js') %>"></script>

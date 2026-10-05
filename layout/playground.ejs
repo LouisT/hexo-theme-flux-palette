@@ -1,0 +1,6 @@
+<article class="post-single">
+    <h1 class="page-title">Theme playground</h1><%- partial('partial/reading-tools') %><div
+        class="post-content"><%- page.content %></div>
+</article>
+<h2>Search</h2><%- partial('partial/search-form') %>
+<%- partial('partial/project-list', {projects: page.projects || [], title: 'Portfolio filters'}) %>

@@ -2,7 +2,16 @@
 const fs = require('fs'),
     path = require('path');
 
+const cache = require('../lib/cache.cjs');
 let PALLETE_CACHE = null;
+
+hexo.extend.filter.register(
+    'before_generate',
+    () => {
+        PALLETE_CACHE = null;
+    },
+    1
+);
 
 // Get merged options with defaults
 function getOptions(themeConfig) {
@@ -11,25 +20,33 @@ function getOptions(themeConfig) {
         enabled: cfg.enabled !== false,
         default_dark: cfg.default_dark || 'solar-amber',
         default_light: cfg.default_light || 'paper-and-ink',
-        palette_folder: cfg.palette_folder || 'css/palettes'
+        palette_folder: cfg.palette_folder || 'css/palettes',
+        include: cfg.include,
     };
 }
 
-// Get the list of available palettes
+// Cache the enabled palette catalog outside development mode
 function getPalettes(ctx) {
-    if (hexo.env?.env !== 'development' && Array.isArray(PALLETE_CACHE))
-        return PALLETE_CACHE;
+    if (hexo.env?.env !== 'development' && Array.isArray(PALLETE_CACHE)) return PALLETE_CACHE;
     const options = getOptions(ctx.theme.config);
 
-    // e.g. "css" or "css/palettes"
-    const folderAbs = path.join(hexo.theme_dir, 'source', (options.palette_folder || 'css/palettes').replace(/^\/+/, '').replace(/\/+$/, ''));
+    // Resolve the configured palette folder within the theme source
+    const folderAbs = path.join(
+        hexo.theme_dir,
+        'source',
+        (options.palette_folder || 'css/palettes').replace(/^\/+/, '').replace(/\/+$/, '')
+    );
 
     // Read all files in the palette folder
     let files;
     try {
         files = [
-            ...fs.readdirSync(path.join(folderAbs, 'enabled/dark')).map(f => path.join(folderAbs, 'enabled/dark', f)),
-            ...fs.readdirSync(path.join(folderAbs, 'enabled/light')).map(f => path.join(folderAbs, 'enabled/light', f)),
+            ...fs
+                .readdirSync(path.join(folderAbs, 'enabled/dark'))
+                .map((f) => path.join(folderAbs, 'enabled/dark', f)),
+            ...fs
+                .readdirSync(path.join(folderAbs, 'enabled/light'))
+                .map((f) => path.join(folderAbs, 'enabled/light', f)),
         ];
     } catch (err) {
         // Folder missing or unreadable
@@ -38,37 +55,53 @@ function getPalettes(ctx) {
     }
 
     PALLETE_CACHE = files
-        .filter(f => /^.*\.css$/.test(f)) // Only .css files
-        .map(f => {
+        .filter(
+            (f) =>
+                /^.*\.css$/.test(f) &&
+                (!options.include ||
+                    options.include.includes(
+                        path
+                            .basename(f)
+                            .replace(/^palette-/, '')
+                            .replace(/\.css$/, '')
+                    ))
+        ) // Only .css files
+        .map((f) => {
             const folder = path.dirname(f),
                 file = path.basename(f),
                 key = file
-                    .replace(/^palette-/, '')   // palette-default.css -> default.css
-                    .replace(/\.css$/, ''),    // default.css -> default
+                    .replace(/^palette-/, '') // palette-default.css -> default.css
+                    .replace(/\.css$/, ''), // default.css -> default
                 name = key
                     .split(/[-_]/)
-                    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+                    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
                     .join(' ')
                     .replace(/\sand\s/gi, ' & ');
             return {
-                folder, // "...css/palettes/enabled/dark"
-                file,   // "blood-red.css"
-                key,    // "blood-red"
-                name,   // "Blood Red"
-                mode: folder.includes("enabled/dark") ? "dark" : "light",   // "dark" or "light"
+                folder, // Source directory
+                file, // CSS filename
+                key, // Palette key
+                name, // Display name
+                mode: folder.includes('enabled/dark') ? 'dark' : 'light', // Palette color mode
             };
         });
 
     return PALLETE_CACHE;
 }
 
-
 // Returns a list of available palettes
 hexo.extend.helper.register('palette_list', function () {
-    return getPalettes(this)?.map?.(p => ({ key: p.key, name: p.name, file: p.file, mode: p.mode })) || [];
+    return (
+        getPalettes(this)?.map?.((p) => ({
+            key: p.key,
+            name: p.name,
+            file: p.file,
+            mode: p.mode,
+        })) || []
+    );
 });
 
-// Generate a bundle of all palettes to `css/palettes.css`
+// Bundle enabled palettes into the shared palette stylesheet
 hexo.extend.generator.register('theme_palettes_bundle', function () {
     const palettes = getPalettes(this);
     if (!palettes.length) {
@@ -77,7 +110,7 @@ hexo.extend.generator.register('theme_palettes_bundle', function () {
     }
 
     // Read each palette file
-    const parts = palettes.map(p => {
+    const parts = palettes.map((p) => {
         const key = p.key,
             file = p.file,
             folder = p.folder,
@@ -105,25 +138,25 @@ hexo.extend.generator.register('theme_palettes_bundle', function () {
             return;
         }
 
-        // Replace :root with the palette selector
+        // Scope palette rules to their selected key before bundling
         let selector = `:root[data-palette="${key}"]`,
             rewritten = content.replace(/:root\b/g, selector);
-        if (rewritten === content)
-            rewritten = `${selector} {\n ${content}\n}\n`;
+        if (rewritten === content) rewritten = `${selector} {\n ${content}\n}\n`;
         return `/* ==== Palette: ${key} (${file}) ==== */\n${rewritten.trim()}\n`;
     });
 
-    // No parts?
+    // Skip bundling when no palette parts are available
     if (!parts.length) {
         this.log.warn('[palette-bundle] No palette CSS could be bundled.');
         return;
     }
 
     // Serve as /css/palettes.css
-    return {
-        path: 'css/palettes.css',
-        data: function () {
-            return parts.join('\n');
-        }
-    };
+    const bundleKey = [parts, cache.hash(fs.readFileSync(__filename))];
+    let bundle = cache.get(hexo, 'palettes', bundleKey);
+    if (!bundle) {
+        bundle = parts.join('\n');
+        cache.set(hexo, 'palettes', bundleKey, bundle);
+    }
+    return { path: 'css/palettes.css', data: bundle };
 });

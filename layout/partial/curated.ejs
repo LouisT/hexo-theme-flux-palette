@@ -1,0 +1,50 @@
+<% var curated = flux_curated(); if (curated) { %>
+<div class="home-curated">
+    <% [['Pinned articles', 'pinned', curated.posts, curated.pinned_limit], ['Featured projects', 'featured', curated.projects, curated.projects_limit]].forEach(function(section) { if (section[2].length) { %>
+    <section class="curated-section" aria-labelledby="curated-<%= section[1] %>-title"
+        x-data="curatedCarousel">
+        <div class="curated-heading">
+            <h2 id="curated-<%= section[1] %>-title"><%= section[0] %></h2>
+            <div class="curated-controls" role="group"
+                aria-label="<%= section[0] %> scroll controls" x-ref="controls" hidden>
+                <button type="button" class="curated-arrow"
+                    aria-label="Scroll <%= section[0].toLowerCase() %> left"
+                    aria-controls="curated-<%= section[1] %>-list" @click="move(-1)"
+                    :disabled="atStart" disabled>
+                    <svg aria-hidden="true" focusable="false" width="20" height="20"
+                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="m14 6-6 6 6 6"></path>
+                    </svg>
+                </button>
+                <span class="curated-position" role="status" x-text="position"></span>
+                <button type="button" class="curated-arrow"
+                    aria-label="Scroll <%= section[0].toLowerCase() %> right"
+                    aria-controls="curated-<%= section[1] %>-list" @click="move(1)"
+                    :disabled="atEnd" disabled>
+                    <svg aria-hidden="true" focusable="false" width="20" height="20"
+                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="m10 6 6 6-6 6"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <div class="curated-grid" id="curated-<%= section[1] %>-list" role="region"
+            aria-label="<%= section[0] %> cards" tabindex="0" x-ref="track" @keydown="key($event)"
+            style="--curated-per-view: <%= Math.min(section[3], section[2].length) %>">
+            <% section[2].forEach(function(item) { %><article class="post-card">
+                <h3><a href="<%= item.url %>"><%= item.title %></a><% if (item.encrypted) { %>
+                    🔒<% } %></h3>
+                <p><%= item.excerpt %></p>
+            </article><% }); %>
+        </div>
+    </section>
+    <% } }); %>
+    <% if (curated.topics.length) { %><nav class="curated-topics" aria-label="Explore topics">
+        <h2>Explore topics</h2>
+        <ul><% curated.topics.forEach(function(topic) { %><li><a
+                    href="<%= url_for(topic.url) %>"><%= topic.label %></a></li><% }); %></ul>
+    </nav><% } %>
+</div>
+<% } %>

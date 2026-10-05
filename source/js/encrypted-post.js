@@ -1,4 +1,31 @@
-document.addEventListener('alpine:init', () => {
+window.Flux.register('encrypted-post', () => {
+    // Keep the article toolbar synchronized with its protected content component
+    Alpine.data('articleLock', () => ({
+        unlocked: false,
+        busy: false,
+        article: null,
+        target: null,
+        stateHandler: null,
+        // Track unlock state published by the matching protected article component
+        init() {
+            this.article = this.$el.closest('.post-single');
+            this.target = this.article?.querySelector('.encrypted-post');
+            this.stateHandler = (event) => {
+                if (event.target !== this.target) return;
+                this.unlocked = event.detail.unlocked;
+                this.busy = event.detail.busy;
+            };
+            this.article?.addEventListener('flux:protected-state', this.stateHandler);
+        },
+        // Forward the toolbar action to the protected article lock control
+        toggle() {
+            this.target?.dispatchEvent(new CustomEvent('flux:toggle-lock'));
+        },
+        // Remove protected state listeners when the toolbar leaves
+        destroy() {
+            this.article?.removeEventListener('flux:protected-state', this.stateHandler);
+        },
+    }));
     Alpine.data('encryptedPost', (slug, apiUrl) => ({
         slug,
         apiUrl,
@@ -8,165 +35,182 @@ document.addEventListener('alpine:init', () => {
         isDecrypting: false,
         derivedKey: null,
         imagesData: {},
+        urls: [],
+        generation: 0,
+        observer: null,
+        controller: null,
+        element: null,
+        toggleHandler: null,
+        // Wire lock controls and publish the initial protected state
+        init() {
+            this.element = this.$el;
+            this.toggleHandler = () => {
+                if (this.isDecrypting) return;
+                if (this.decryptedContent) this.lock(true);
+                else this.focusPassword();
+            };
+            this.element.addEventListener('flux:toggle-lock', this.toggleHandler);
+            this.publishState();
+        },
+        // Notify the toolbar when unlock progress or visibility changes
+        publishState() {
+            this.element.dispatchEvent(
+                new CustomEvent('flux:protected-state', {
+                    bubbles: true,
+                    detail: {
+                        unlocked: Boolean(this.decryptedContent),
+                        busy: this.isDecrypting,
+                    },
+                })
+            );
+        },
+        // Focus the password field when the article needs to be unlocked
+        focusPassword() {
+            this.$nextTick(() => this.$refs.passwordInput?.focus());
+        },
+        // Decode encrypted payload fields into bytes for the Web Crypto API
         base64ToUint8Array(b64) {
-            const binary = atob(b64),
-                len = binary.length,
-                bytes = new Uint8Array(len);
-            for (let i = 0; i < len; i++)
-                bytes[i] = binary.charCodeAt(i);
-            return bytes;
+            return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
         },
-        async setError(msg, timeout = 5000) {
-            clearTimeout(this.errorTimer);
-            this.error = msg;
-            if (timeout)
-                this.errorTimer = setTimeout(() => this.error = '', timeout);
-            return Promise.reject(new Error(msg));
-        },
+        // Derive a non-exportable AES key using the build-time PBKDF2 parameters
         async deriveKey(password, salt, iterations) {
-            return crypto.subtle.deriveKey({
-                name: 'PBKDF2',
-                salt,
-                iterations,
-                hash: 'SHA-256'
-            },
-                (await crypto.subtle.importKey(
-                    'raw',
-                    (new TextEncoder()).encode(password), {
-                    name: 'PBKDF2'
-                },
-                    false,
-                    ['deriveKey']
-                )), {
-                name: 'AES-GCM',
-                length: 256
-            },
-                true,
+            const base = await crypto.subtle.importKey(
+                'raw',
+                new TextEncoder().encode(password),
+                'PBKDF2',
+                false,
+                ['deriveKey']
+            );
+            return crypto.subtle.deriveKey(
+                { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
+                base,
+                { name: 'AES-GCM', length: 256 },
+                false,
                 ['decrypt']
             );
         },
-        async decryptChunk(key, ctStr, ivStr, atStr) {
-            const ciphertext = this.base64ToUint8Array(ctStr),
-                authTag = this.base64ToUint8Array(atStr),
-                iv = this.base64ToUint8Array(ivStr);
-
-            // Web Crypto expects tag appended to ciphertext
-            const combinedData = new Uint8Array(ciphertext.length + authTag.length);
-            combinedData.set(ciphertext);
-            combinedData.set(authTag, ciphertext.length);
-
-            // Decrypt chunk
+        // Append the authentication tag to match the Web Crypto AES-GCM input format
+        async decryptChunk(key, ct, iv, at) {
+            const body = this.base64ToUint8Array(ct),
+                tag = this.base64ToUint8Array(at),
+                combined = new Uint8Array(body.length + tag.length);
+            combined.set(body);
+            combined.set(tag, body.length);
             return crypto.subtle.decrypt(
-                { name: 'AES-GCM', iv: iv, tagLength: 128 },
+                { name: 'AES-GCM', iv: this.base64ToUint8Array(iv), tagLength: 128 },
                 key,
-                combinedData
+                combined
             );
         },
+        // Fetch and decrypt the payload while ignoring work invalidated by locking
         async handleUnlock() {
-            if (!this.password)
-                return await this.setError('Please enter a password.');
-            if (!this.apiUrl)
-                return await this.setError('Configuration error: No API URL found.');
-
+            if (this.isDecrypting) return;
+            if (!this.password) {
+                this.error = 'Please enter a password.';
+                return;
+            }
+            const generation = ++this.generation,
+                password = this.password;
             this.isDecrypting = true;
             this.error = '';
-
+            this.controller = new AbortController();
+            this.publishState();
             try {
-                // Fetch the encrypted payload from the API
-                const response = await fetch(this.apiUrl);
-                if (!response.ok)
-                    throw new Error('Failed to fetch encrypted content.');
-                const payload = await response.json();
-
-                // Derive and cache Key
-                this.derivedKey = await this.deriveKey(
-                    this.password,
-                    this.base64ToUint8Array(payload.s),
-                    payload.i
-                );
-
-                // Decrypt main post content
-                const decryptedBuffer = await this.decryptChunk(
-                    this.derivedKey,
-                    payload.ct, // content ciphertext
-                    payload.iv, // content iv
-                    payload.at // content auth tag
-                );
-
-                // Reveal content
-                this.decryptedContent = new TextDecoder().decode(decryptedBuffer);
+                const response = await fetch(this.apiUrl, {
+                    signal: this.controller.signal,
+                    cache: 'no-store',
+                });
+                if (!response.ok) throw new Error('Could not load encrypted content');
+                const payload = await response.json(),
+                    key = await this.deriveKey(
+                        password,
+                        this.base64ToUint8Array(payload.s),
+                        payload.i
+                    ),
+                    buffer = await this.decryptChunk(key, payload.ct, payload.iv, payload.at);
+                if (generation !== this.generation) return;
+                this.derivedKey = key;
                 this.imagesData = payload.imgs || {};
-
-                // Setup Lazy Loading after DOM update
+                this.decryptedContent = new TextDecoder().decode(buffer);
                 this.$nextTick(() => {
-                    this.initLazyLoader();
+                    if (generation === this.generation) this.initLazyLoader();
                 });
             } catch (e) {
-                console.error(e);
-                if (e.name === 'OperationError' || e.message.includes('decrypt'))
-                    return await this.setError('Incorrect password or decryption failed.');
-                return await this.setError('Failed to load content. Please check your connection.');
+                if (generation === this.generation && e.name !== 'AbortError')
+                    this.error =
+                        e.name === 'OperationError'
+                            ? 'Incorrect password or decryption failed.'
+                            : 'Could not load content. Check your connection and try again.';
             } finally {
-                this.isDecrypting = false;
-                this.password = ''; // Clear password from memory
+                if (generation === this.generation) {
+                    this.isDecrypting = false;
+                    this.password = '';
+                    this.publishState();
+                }
             }
         },
+        // Decrypt protected images only as they approach the viewport
         initLazyLoader() {
-            // Find container using x-ref
-            const container = this.$refs.contentContainer;
-            if (!container)
+            const images = this.$refs.contentContainer?.querySelectorAll('img[data-enc-id]') || [];
+            this.observer?.disconnect();
+            if (!window.IntersectionObserver) {
+                images.forEach((img) => this.revealImage(img.dataset.encId, img));
                 return;
-
-            // Find all placeholder images
-            const images = container.querySelectorAll('img[data-enc-id]');
-            if (images.length === 0)
-                return;
-
-            // Setup intersection observer
-            const observer = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        const img = entry.target,
-                            id = img.dataset.encId;
-
-                        // Decrypt if we have data for this ID
-                        if (id && this.imagesData[id]) {
-                            this.revealImage(id, img);
-                            observer.unobserve(img); // Only decrypt once
-                        }
-                    }
-                });
-            }, { rootMargin: '200px' }); // Preload 200px before appearing
-
-            images.forEach(img => observer.observe(img));
-        },
-        async revealImage(id, imgEl) {
-            try {
-                const imgData = this.imagesData[id];
-
-                // Create blob URL
-                const blobUrl = URL.createObjectURL(new Blob([
-                    await this.decryptChunk(
-                        this.derivedKey,
-                        imgData.ct,
-                        imgData.iv,
-                        imgData.at
-                    )
-                ], { type: imgData.m }));
-
-                // Decrypt image + set source
-                imgEl.src = blobUrl;
-
-                // Update original source for lightbox support
-                // This ensures the lightbox uses the decrypted blob instead of the protected/offline path
-                imgEl.dataset.originalSrc = blobUrl;
-
-                // Remove from cache
-                delete this.imagesData[id];
-            } catch (e) {
-                console.error(`Failed to decrypt image ${id}`, e);
-                imgEl.alt = 'Decryption Failed';
             }
-        }
+            this.observer = new IntersectionObserver(
+                (entries) =>
+                    entries.forEach((entry) => {
+                        if (entry.isIntersecting) {
+                            this.revealImage(entry.target.dataset.encId, entry.target);
+                            this.observer.unobserve(entry.target);
+                        }
+                    }),
+                { rootMargin: '200px' }
+            );
+            images.forEach((img) => this.observer.observe(img));
+        },
+        // Attach a decrypted image only while its article remains unlocked
+        async revealImage(id, img) {
+            const generation = this.generation,
+                data = this.imagesData[id],
+                key = this.derivedKey;
+            if (!data || !key) return;
+            try {
+                const buffer = await this.decryptChunk(key, data.ct, data.iv, data.at);
+                if (generation !== this.generation || !img.isConnected) return;
+                const url = URL.createObjectURL(new Blob([buffer], { type: data.m }));
+                this.urls.push(url);
+                img.src = url;
+                img.dataset.originalSrc = url;
+                delete this.imagesData[id];
+            } catch {
+                if (generation === this.generation) img.alt = 'Image could not be decrypted';
+            }
+        },
+        // Invalidate pending decryptions and release every decrypted object URL
+        lock(focus = false) {
+            ++this.generation;
+            this.controller?.abort();
+            this.observer?.disconnect();
+            this.controller = null;
+            this.observer = null;
+            Flux.emit('lock', { urls: this.urls.slice() });
+            this.urls.forEach((url) => URL.revokeObjectURL(url));
+            this.urls = [];
+            this.decryptedContent = '';
+            this.$refs.contentContainer?.replaceChildren();
+            this.derivedKey = null;
+            this.imagesData = {};
+            this.password = '';
+            this.error = '';
+            this.isDecrypting = false;
+            this.publishState();
+            if (focus) this.focusPassword();
+        },
+        // Relock content and remove toolbar handlers when the article leaves
+        destroy() {
+            this.element.removeEventListener('flux:toggle-lock', this.toggleHandler);
+            this.lock();
+        },
     }));
 });

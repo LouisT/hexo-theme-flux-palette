@@ -30,33 +30,36 @@
     return { href: href, attrs: attrs };
   }
 %>
-<header class="site-header" x-data="{ isOpen: false }" x-on:resize.window="if (window.innerWidth > 768) isOpen = false">
-  <div class="header-inner">
-    <div class="logo">
-      <a href="<%= config.root %>">
-        <span class="logo-mark">●</span>
-        <span class="logo-text-wrap">
-          <span class="logo-text">
-            <%= theme.logo_text || config.title %>
-          </span>
-          <% if (theme.subtitle || config.subtitle) { %>
-          <span class="logo-subtitle">
-            <%= theme.subtitle || config.subtitle %>
-          </span>
-          <% } %>
-        </span>
-      </a>
-    </div>
-    <button class="nav-toggle" type="button" aria-label="Toggle navigation" x-on:click="isOpen = !isOpen" :aria-expanded="isOpen.toString()" aria-controls="main-nav" :class="{ 'is-open': isOpen }">
-      <span class="nav-toggle-box">
-        <span class="nav-toggle-line"></span>
-        <span class="nav-toggle-line"></span>
-        <span class="nav-toggle-line"></span>
-      </span>
-    </button>
-    <nav class="main-nav" id="main-nav" :class="{ 'is-open': isOpen }">
-      <ul>
-        <%
+<header class="site-header" x-data="{ isOpen: false }"
+    x-on:resize.window="if (window.innerWidth > 768) isOpen = false">
+    <div class="header-inner">
+        <div class="logo">
+            <a href="<%= config.root %>">
+                <span class="logo-mark">●</span>
+                <span class="logo-text-wrap">
+                    <span class="logo-text">
+                        <%= theme.logo_text || config.title %>
+                    </span>
+                    <% if (theme.subtitle || config.subtitle) { %>
+                    <span class="logo-subtitle">
+                        <%= theme.subtitle || config.subtitle %>
+                    </span>
+                    <% } %>
+                </span>
+            </a>
+        </div>
+        <button class="nav-toggle" type="button" aria-label="Toggle navigation"
+            x-on:click="isOpen = !isOpen" :aria-expanded="isOpen.toString()"
+            aria-controls="main-nav" :class="{ 'is-open': isOpen }">
+            <span class="nav-toggle-box">
+                <span class="nav-toggle-line"></span>
+                <span class="nav-toggle-line"></span>
+                <span class="nav-toggle-line"></span>
+            </span>
+        </button>
+        <nav class="main-nav" id="main-nav" :class="{ 'is-open': isOpen }">
+            <ul>
+                <%
           menuKeys.forEach(function(label) {
             var item = mergedMenu[label];
             if (typeof item === 'string') {
@@ -66,21 +69,29 @@
                   external = isExternal(href),
                   url = external ? href : url_for(href);
         %>
-        <li>
-          <a href="<%= url %>" <% if (external) { %> target="_blank" rel="noopener" <% } %> <%- attrs %>>
-            <%= label %>
-          </a>
-        </li>
-        <% } else { %>
-        <li class="dropdown-item" x-data="{ open: false }" @mouseenter="if(window.innerWidth > 768) open = true" @mouseleave="if(window.innerWidth > 768) open = false">
-          <button type="button" class="dropdown-toggle" @click="open = !open" :aria-expanded="open">
-            <%= label %>
-            <svg class="dropdown-caret" :class="{ 'open': open }" width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M1 1L5 5L9 1" />
-            </svg>
-          </button>
-          <ul class="dropdown-menu" x-show="open" x-transition.opacity x-cloak>
-            <%
+                <li>
+                    <a href="<%= url %>" <% if (external) { %> target="_blank" rel="noopener"
+                        <% } %> <%- attrs %>>
+                        <%= label %>
+                    </a>
+                </li>
+                <% } else { %>
+                <li class="dropdown-item" x-data="{ open: false }"
+                    @keydown.escape="open = false; $el.querySelector('button').focus()"
+                    @focusout="if (!$el.contains($event.relatedTarget)) open = false"
+                    @mouseenter="if(window.innerWidth > 768) open = true"
+                    @mouseleave="if(window.innerWidth > 768) open = false">
+                    <button type="button" class="dropdown-toggle" @click="open = !open"
+                        :aria-expanded="open">
+                        <%= label %>
+                        <svg class="dropdown-caret" :class="{ 'open': open }" width="10" height="6"
+                            viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M1 1L5 5L9 1" />
+                        </svg>
+                    </button>
+                    <ul class="dropdown-menu" x-show="open" x-transition.opacity x-cloak>
+                        <%
               Object.keys(item).forEach(function(subLabel) {
                 var subItem = item[subLabel],
                     parsed = parseNav(subItem),
@@ -89,19 +100,20 @@
                     subExternal = isExternal(subHref),
                     subUrl = subExternal ? subHref : url_for(subHref);
             %>
-            <li>
-              <a href="<%= subUrl %>" <% if (subExternal) { %> target="_blank" rel="noopener" <% } %> <%- subAttrs %>>
-                <%= subLabel %>
-              </a>
-            </li>
-            <% });
+                        <li>
+                            <a href="<%= subUrl %>" <% if (subExternal) { %> target="_blank"
+                                rel="noopener" <% } %> <%- subAttrs %>>
+                                <%= subLabel %>
+                            </a>
+                        </li>
+                        <% });
             %>
-          </ul>
-        </li>
-        <% } %>
-        <% });
+                    </ul>
+                </li>
+                <% } %>
+                <% });
         %>
-      </ul>
-    </nav>
-  </div>
+            </ul>
+        </nav>
+    </div>
 </header>

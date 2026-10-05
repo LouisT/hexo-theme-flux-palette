@@ -1,0 +1,69 @@
+<section class="post-index">
+    <% if (typeof title !== 'undefined' && title) { %>
+    <h1 class="page-title"><%= title %></h1>
+    <% } %>
+    <% posts.each(function(post) { %>
+    <article class="post-card<%= theme.reading?.enabled !== false ? ' bookmark-card' : '' %>">
+        <% if (theme.reading?.enabled !== false) { %>
+        <%- partial('partial/card-bookmark', {item: post, type: 'post'}) %>
+        <% } %>
+        <h2 class="post-title">
+            <a href="<%= url_for(post.path) %>"><%= post.title %></a>
+            <% if (post.encrypted || post.password) { %>
+            <%- partial('partial/lock') %>
+            <% } %>
+        </h2>
+
+        <div class="post-meta">
+            <time datetime="<%= date_xml(post.date) %>">
+                <%= date(post.date, config.date_format || 'YYYY-MM-DD') %>
+            </time>
+
+            <% if (post.categories && post.categories.length) { %>
+            <span class="meta-sep">-</span>
+            <span>
+                <% post.categories.forEach(function(cat, i) { %>
+                <a
+                    href="<%= url_for(cat.path) %>"><%= cat.name %></a><%= i < post.categories.length - 1 ? ', ' : '' %>
+                <% }); %>
+            </span>
+            <% } %>
+
+            <% if (post.read_time_text || post.read_time) { %>
+            <span class="meta-sep">-</span>
+            <span class="post-readtime">
+                <%= post.read_time_text || (post.read_time && post.read_time.text) %>
+            </span>
+            <% } %>
+        </div>
+
+        <div class="post-excerpt">
+            <% if (post.excerpt) { %>
+            <%- strip_html(post.excerpt).substring(0, 220) %>
+            <% } else { %>
+            <%- strip_html(post.content).substring(0, 220) %>
+            <% } %>
+        </div>
+
+        <% if (post.tags && post.tags.length) { %>
+        <div class="post-tags">
+            Tags:
+            <% post.tags.forEach(function(tag, i) { %>
+            <a
+                href="<%= url_for(tag.path) %>"><%= tag.name %></a><%= i < post.tags.length - 1 ? ', ' : '' %>
+            <% }) %>
+        </div>
+        <% } %>
+
+        <div class="post-meta-bottom">
+            <a class="post-btn" href="<%= url_for(post.path) %>">Read more</a>
+            <% if (post.short_hash) { %>
+            <a href="<%= url_for('/s/' + post.short_hash + '/') %>">
+                #<%= post.short_hash %>
+            </a>
+            <% } %>
+        </div>
+    </article>
+    <% }); %>
+    <%- partial('partial/pagination', {pagination: pagination, label: 'Blog pages'}) %>
+</section>

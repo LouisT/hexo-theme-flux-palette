@@ -1,10 +1,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="icon" type="image/png" href="/images/favicon/favicon-96x96.png" sizes="96x96" />
-<link rel="icon" type="image/svg+xml" href="/images/favicon/favicon.svg" />
-<link rel="shortcut icon" href="/images/favicon/favicon.ico" />
-<link rel="apple-touch-icon" sizes="180x180" href="/images/favicon/apple-touch-icon.png" />
-<link rel="manifest" href="/images/favicon/site.webmanifest" />
+<link rel="icon" <% if (!theme.favicon) { %>type="image/svg+xml" sizes="any"
+    data-flux-favicon<% } %> href="<%= url_for(theme.favicon || '/images/flux-icon.svg') %>">
 <%
     var resolvedPageTitle = page.title || '';
     if (!resolvedPageTitle && typeof is_category === 'function' && is_category() && page.category) {
@@ -12,29 +9,33 @@
     }
 
     var pageTitle = (resolvedPageTitle ? resolvedPageTitle + ' | ' : '') + config.title + (config.subtitle ? ' ' + config.subtitle : ''),
-        description = page.description || page.excerpt || page.content || config.description || '';
+        description = (page.project?.encrypted || page.encrypted || page.password) ? 'This content has been password protected.' : page.description || page.excerpt || page.project?.project_summary || page.content || config.description || '';
     if (description) {
         description = strip_html(description).substring(0, 200).replace(/^\s+|\s+$/g, '');
     }
+    var metadataItem = page.project || page;
     var ogType = is_post() ? 'article' : 'website',
-        ogImage = page.cover || page.image || theme.default_og_image;
+        ogImage = (page.project?.encrypted || page.encrypted || page.password) ? null : metadataItem.cover || metadataItem.image || theme.default_og_image;
 %>
 <title><%= pageTitle %></title>
+<link rel="canonical" href="<%= flux_canonical() %>">
+<script type="application/ld+json"
+    data-flux-schema><%- flux_json(flux_schema(description, ogImage)) %></script>
 <meta name="description" content="<%= description %>">
 <meta property="og:type" content="<%= ogType %>">
 <meta property="og:title" content="<%= pageTitle %>">
-<meta property="og:url" content="<%= url_for(page.path) %>">
+<meta property="og:url" content="<%= flux_canonical() %>">
 <meta property="og:site_name" content="<%= config.title %>">
 <meta property="og:description" content="<%= description %>">
 <meta property="og:locale" content="<%= config.language || 'en' %>">
 <% if (ogImage) { %>
-<meta property="og:image" content="<%= url_for(ogImage) %>">
+<meta property="og:image" content="<%= full_url_for(ogImage) %>">
 <% } %>
 <meta name="twitter:card" content="<%= ogImage ? 'summary_large_image' : 'summary' %>">
 <meta name="twitter:title" content="<%= pageTitle %>">
 <meta name="twitter:description" content="<%= description %>">
 <% if (ogImage) { %>
-<meta name="twitter:image" content="<%= url_for(ogImage) %>">
+<meta name="twitter:image" content="<%= full_url_for(ogImage) %>">
 <% } %>
 <%
   var palettes = palette_list ? palette_list() : [],
@@ -79,16 +80,14 @@
     document.documentElement.setAttribute('data-palette', String(key).replace(/[^a-zA-Z0-9_-]/g, ''));
   })();
 </script>
-<link rel="preload" href="<%= url_for('/css/base.css') %>" as="style">
-<link rel="preload" href="<%= url_for('/js/view-transitions.js') %>" as="script">
-<% if (theme.sidebar?.palette_selector?.enabled) { %>
-<link rel="preload" href="<%= url_for('/css/palettes.css') %>" as="style">
-<link rel="preload" href="<%= url_for('/js/palette-switcher.js') %>" as="script">
-<% } %>
 <link rel="stylesheet" href="<%= url_for('/css/palettes.css') %>">
 <link rel="stylesheet" href="<%= url_for('/css/base.css') %>">
 <link rel="stylesheet" href="<%= url_for('/css/markdown.css') %>">
-<script src="<%= url_for('/js/view-transitions.js') %>"></script>
-<script src="<%= url_for('/js/code-copy.js') %>"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.3/dist/cdn.min.js"></script>
+<link rel="stylesheet" href="<%= url_for('/css/features.css') %>">
+<link rel="stylesheet" href="<%= url_for('/css/rich-content.css') %>">
+<% if (flux_manifest().math) { %>
+<link rel="stylesheet" data-flux-math href="<%= url_for('/css/vendor/katex.css') %>">
+<% } %>
+<% if (theme.print?.enabled !== false) { %>
+<link rel="stylesheet" media="print" href="<%= url_for('/css/print.css') %>"><% } %>
+<script defer src="<%= url_for('/js/runtime.js') %>"></script>

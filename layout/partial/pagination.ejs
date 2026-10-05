@@ -1,0 +1,70 @@
+<% var paging = pagination || page, current = paging.current || 1, total = paging.total || 1, base = paging.pagination_base || '', directory = paging.pagination_dir || 'page', interactive = typeof dynamic !== 'undefined' && dynamic, pageLabel = typeof label !== 'undefined' ? label : 'Pages'; %>
+<% if (total > 1) { %>
+<nav class="pagination pagination-controls" aria-label="<%= pageLabel %>"
+    <% if (interactive) { %>x-show="!enhanced" <% } %>>
+    <% if (current > 1) { %>
+    <a class="pagination-link pagination-direction prev"
+        href="<%= url_for(flux_page_path(base, current - 1, directory)) %>" rel="prev"
+        aria-label="Previous page"><span aria-hidden="true">←</span> Previous</a>
+    <% } else { %>
+    <span class="pagination-link pagination-direction is-disabled" aria-disabled="true"><span
+            aria-hidden="true">←</span> Previous</span>
+    <% } %>
+    <ol class="pagination-pages">
+        <% flux_page_items(current, total).forEach(function(item) { %>
+        <li>
+            <% if (item.number) { %>
+            <a class="pagination-link<%= item.number === current ? ' is-current' : '' %>"
+                href="<%= url_for(flux_page_path(base, item.number, directory)) %>"
+                aria-label="Page <%= item.number %>"
+                <% if (item.number === current) { %>aria-current="page"
+                <% } %>><%= item.number %></a>
+            <% } else { %>
+            <span class="pagination-gap" aria-hidden="true">…</span>
+            <% } %>
+        </li>
+        <% }); %>
+    </ol>
+    <% if (current < total) { %>
+    <a class="pagination-link pagination-direction next"
+        href="<%= url_for(flux_page_path(base, current + 1, directory)) %>" rel="next"
+        aria-label="Next page">Next <span aria-hidden="true">→</span></a>
+    <% } else { %>
+    <span class="pagination-link pagination-direction is-disabled" aria-disabled="true">Next <span
+            aria-hidden="true">→</span></span>
+    <% } %>
+    <p class="pagination-summary">Page <%= current %> of <%= total %></p>
+</nav>
+<% } %>
+<% if (interactive) { %>
+<nav class="pagination pagination-controls" aria-label="<%= pageLabel %>" x-cloak
+    x-show="enhanced && pages > 1">
+    <a class="pagination-link pagination-direction prev" role="link"
+        :class="{ 'is-disabled': current <= 1 }" :href="current > 1 ? pageHref(current - 1) : null"
+        :aria-disabled="current <= 1 ? 'true' : null" :tabindex="current <= 1 ? -1 : null"
+        :rel="current > 1 ? 'prev' : null" @click="goTo(current - 1, $event)"
+        aria-label="Previous page"><span aria-hidden="true">←</span> Previous</a>
+    <ol class="pagination-pages">
+        <template x-for="item in pageItems" :key="item.key">
+            <li>
+                <template x-if="item.number">
+                    <a class="pagination-link" :class="{ 'is-current': item.number === current }"
+                        :href="pageHref(item.number)" :aria-label="'Page ' + item.number"
+                        :aria-current="item.number === current ? 'page' : null"
+                        @click="goTo(item.number, $event)" x-text="item.number"></a>
+                </template>
+                <template x-if="!item.number"><span class="pagination-gap"
+                        aria-hidden="true">…</span></template>
+            </li>
+        </template>
+    </ol>
+    <a class="pagination-link pagination-direction next" role="link"
+        :class="{ 'is-disabled': current >= pages }"
+        :href="current < pages ? pageHref(current + 1) : null"
+        :aria-disabled="current >= pages ? 'true' : null" :tabindex="current >= pages ? -1 : null"
+        :rel="current < pages ? 'next' : null" @click="goTo(current + 1, $event)"
+        aria-label="Next page">Next <span aria-hidden="true">→</span></a>
+    <p class="pagination-summary" aria-live="polite" x-text="'Page ' + current + ' of ' + pages">
+    </p>
+</nav>
+<% } %>

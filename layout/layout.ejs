@@ -1,35 +1,38 @@
 <!DOCTYPE html>
 <html lang="<%= config.language || 'en' %>">
 
-<head>
-  <%- partial('partial/head') %>
-</head>
+    <head>
+        <%- partial('partial/head') %>
+    </head>
 
-<body class="site">
-  <%- partial('partial/header') %>
+    <body class="site">
+        <a class="skip-link" href="#main-content">Skip to content</a>
+        <script type="application/json"
+            id="flux-manifest"><%- flux_json(flux_manifest()) %></script>
+        <%- partial('partial/header') %>
 
-  <div class="site-body">
-    <main class="site-main">
-      <%- body %>
-    </main>
-    <aside class="site-sidebar">
-      <%- partial('partial/sidebar') %>
-    </aside>
-  </div>
+        <div class="site-body">
+            <main class="site-main" id="main-content" tabindex="-1">
+                <%- body %>
+            </main>
+            <aside class="site-sidebar">
+                <%- partial('partial/sidebar') %>
+            </aside>
+        </div>
 
-  <footer class="site-footer">
-    <%- partial('partial/footer') %>
-  </footer>
+        <footer class="site-footer">
+            <%- partial('partial/footer') %>
+        </footer>
 
-  <% if (theme.backtotop && theme.backtotop.enabled) { %>
-  <%- partial('partial/back-to-top') %>
-  <% } %>
+        <% if (theme.backtotop && theme.backtotop.enabled) { %>
+        <%- partial('partial/back-to-top') %>
+        <% } %>
 
-  <%- partial('partial/lightbox') %>
+        <% if (flux_manifest().features.includes('lightbox')) { %><%- partial('partial/lightbox') %><% } %>
 
-  <% if (theme.link_previews && theme.link_previews.enabled) { %>
-  <%- partial('partial/link-previews') %>
-  <% } %>
-</body>
+        <% if (theme.link_previews && theme.link_previews.enabled && flux_manifest().features.includes('link-previews')) { %>
+        <%- partial('partial/link-previews') %>
+        <% } %>
+    </body>
 
 </html>

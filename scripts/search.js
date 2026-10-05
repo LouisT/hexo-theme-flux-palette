@@ -1,353 +1,315 @@
-
 'use strict';
-const fs = require('fs'),
-    path = require('path'),
-    fm = require('hexo-front-matter'),
-    https = require('https');
+const content = require('../lib/content.cjs'),
+    cache = require('../lib/cache.cjs'),
+    providers = require('../lib/search-providers.cjs'),
+    errors = require('../lib/search-errors.cjs'),
+    { slugize } = require('hexo-util'),
+    bucket = (word) => (word.codePointAt(0) % 16).toString(16);
 
-// List of supported providers
-const providers = [
-    'upstash',
-    'supabase'
-];
-
-// Reserved placeholders kept in Supabase tables (excluded from rebuild writes)
-const SUPABASE_PLACEHOLDER_ID = 'placeholder',
-    SUPABASE_PLACEHOLDER_WORD = 'placeholder';
-
-// Basic HTML stripper for search index content
-function stripHtml(str) {
-    return String(str || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-}
-
-// Basic markdown stripper for search index content
-function stripMarkdown(str) {
-    if (!str) return '';
-    return str
-        .replace(/<[^>]*>/g, ' ') // HTML tags
-        .replace(/!\[.*?\]\(.*?\)/g, '') // Images
-        .replace(/\[([^\]]+)\]\(.*?\)/g, '$1') // Links
-        .replace(/`{3}[\s\S]*?`{3}/g, '') // Code blocks
-        .replace(/`(.+?)`/g, '$1') // Inline code
-        .replace(/#+\s+/g, '') // Headings
-        .replace(/(\*\*|__)(.*?)\1/g, '$2') // Bold
-        .replace(/(\*|_)(.*?)\1/g, '$2') // Italic
-        .replace(/>\s+/g, '') // Blockquotes
-        .replace(/- \s+/g, '') // Lists
-        .replace(/\s+/g, ' ') // Collapse whitespace
-        .trim();
-}
-
-// Tokenize text into words, preserving specific delimiters like dots/hyphens
-function tokenize(text) {
-    if (!text)
-        return [];
-    return (
-        text.toLowerCase()
-            .match(/[a-z0-9]+(?:[\.\-][a-z0-9]+)*/g) || []
-    ).filter(w => w.length > 1);
-}
-
-// Load projects from the source/_projects folder
-function loadProjectsForSearch(ctx) {
-    const base = path.join(ctx.base_dir, 'source', '_projects');
-    if (!fs.existsSync(base))
-        return [];
-
-    // Parse each file and add it to the projects array
-    return fs.readdirSync(base, { withFileTypes: true })
-        .filter(entry => entry.isFile())
-        .map(entry => entry.name)
-        .filter(name => /\.(md|markdown)$/i.test(name))
-        .map(filename => {
-            try {
-                const raw = fs.readFileSync(path.join(base, filename), 'utf8'),
-                    parsed = fm.parse(raw),
-                    body = parsed._content || '',
-                    slug = parsed.slug || filename.replace(/\.(md|markdown)$/i, ''),
-                    stat = fs.statSync(path.join(base, filename)),
-                    text = stripMarkdown(parsed.excerpt || body);
-
-                return {
-                    id: `project:${slug}`,
-                    title: parsed.title || slug,
-                    url: `projects/${slug}/`,
-                    type: 'project',
-                    date: (parsed.date ? new Date(parsed.date) : stat.mtime).toISOString(),
-                    encrypted: false, // Never encrypted?
-                    tags: (Array.isArray(parsed.tags)
-                        ? parsed.tags
-                        : parsed.tags?.data?.map(t => t.name)
-                    ) || [], excerpt: text.length > 220 ? `${text.slice(0, 217)}...` : text,
-                    content: text
-                };
-            } catch (e) { return null; }
-        }).filter(p => p !== null);
-}
-
-// Gather all posts and projects into a uniform format
-function gatherData(ctx, locals) {
-    const docs = [];
-
-    // Process blog posts
-    locals.posts.forEach(post => {
-        if (post.draft)
-            return;
-
-        const isEncrypted = !!(post.password || post.encrypted),
-            url = post.permalink ? post.permalink.replace(ctx.config.url, '') : post.path;
-
-        let text = '', excerpt = '';
-        if (isEncrypted) {
-            excerpt = 'This post has been password protected.';
-        } else {
-            text = stripHtml(post.excerpt && post.excerpt.length ? post.excerpt : post.content || '');
-            excerpt = text.length > 220 ? `${text.slice(0, 217)}…` : text;
-        }
-
-        docs.push({
-            id: 'post:' + (post._id || post.slug || post.path),
-            title: post.title || '',
-            url: url.startsWith('/') ? url : '/' + url,
-            type: 'post',
-            date: post.date ? post.date.toISOString() : '',
-            encrypted: isEncrypted,
-            tags: (Array.isArray(post.tags)
-                ? post.tags
-                : post.tags?.data?.map(t => t.name)
-            ) || [],
-            excerpt,
-            content: text
-        });
+// Separate public metadata, excerpts, and word indexes for lazy search loading
+function build(ctx, docs) {
+    const index = {},
+        snippets = {},
+        catalog = [];
+    docs.forEach((doc, i) => {
+        const { content: body, excerpt, ...meta } = doc,
+            shard = Math.floor(i / 100);
+        catalog.push({ ...meta, snippet: shard });
+        (snippets[shard] ||= {})[doc.id] = excerpt;
+        const input = [doc.title, ...doc.tags, ...doc.categories, body].join(' '),
+            key = [
+                input,
+                cache.hash(
+                    require('node:fs').readFileSync(require.resolve('../source/js/search-core.js'))
+                ),
+            ],
+            words = doc.encrypted
+                ? content.core.tokenize(input)
+                : cache.get(ctx, 'tokens', key) || content.core.tokenize(input);
+        if (!doc.encrypted) cache.set(ctx, 'tokens', key, words);
+        for (const word of words) (index[word] ||= []).push(doc.id);
     });
-
-    // Process Projects
-    loadProjectsForSearch(ctx).forEach(p => {
-        let url = p.url;
-        if (!/^https?:\/\//i.test(url))
-            url = url.startsWith('/') ? url : '/' + url;
-        docs.push(Object.assign({}, p, { url }));
-    });
-
-    return docs;
+    return { index, snippets, catalog, vocabulary: Object.keys(index).sort() };
 }
 
-// Perform request to Upstash
-async function upstashRequest(urlStr, token, commands) {
-    const response = await fetch(new URL(`${urlStr}/pipeline`), {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
+// Map search topics to the native post and project taxonomy routes
+function topicUrls(ctx, locals, docs) {
+    const taxonomy = (items) =>
+            Object.fromEntries(
+                content.array(items).map((item) => [item.name, content.url(ctx, item.path)])
+            ),
+        projectTags = [
+            ...new Set(docs.filter((doc) => doc.type === 'project').flatMap((doc) => doc.tags)),
+        ];
+    return {
+        post: {
+            tag: taxonomy(locals.tags),
+            category: Object.fromEntries(
+                content
+                    .array(locals.posts)
+                    .filter((post) => post.categories.length)
+                    .map((post) => [content.url(ctx, post.path), taxonomy(post.categories)])
+            ),
         },
-        body: JSON.stringify(commands)
-    });
-
-    // Fetch does not throw on 4xx/5xx errors, so we check response.ok manually
-    if (!response.ok)
-        throw new Error(await response.text());
-
-    // Parse JSON
-    return await response.json();
-}
-
-// Perform request to Supabase
-async function supabaseRequest(urlStr, key, endpoint, method, body) {
-    const response = await fetch(new URL(`${urlStr}/rest/v1/${endpoint}`), {
-        method: method,
-        headers: {
-            'apikey': key,
-            'Authorization': `Bearer ${key}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'return=minimal'
+        project: {
+            tag: Object.fromEntries(
+                projectTags.map((tag) => [
+                    tag,
+                    content.url(ctx, `project-tag/${slugize(tag, { transform: 1 })}/`),
+                ])
+            ),
         },
-        // Only stringify and attach body if it is truthy
-        body: body ? JSON.stringify(body) : undefined
-    });
-
-    // Get raw text from response
-    const data = await response.text();
-    if (!response.ok)
-        throw new Error(data);
-
-    return data;
+    };
 }
 
-// Create local search index file (search/index.json)
+// Emit catalogs and excerpt shards with term shards only for local search
+function routes(data, prefix, local, topics = {}) {
+    const result = [
+            {
+                path: prefix + 'catalog.json',
+                data: JSON.stringify({
+                    version: 3,
+                    docs: data.catalog,
+                    topics,
+                }),
+            },
+            {
+                path: prefix + 'vocabulary.json',
+                data: JSON.stringify({ version: 1, words: data.vocabulary }),
+            },
+        ],
+        shards = {};
+    if (local)
+        for (const [word, ids] of Object.entries(data.index))
+            (shards[bucket(word)] ||= {})[word] = ids;
+    for (const [shard, index] of Object.entries(shards))
+        result.push({ path: prefix + `terms-${shard}.json`, data: JSON.stringify(index) });
+    for (const [shard, snippets] of Object.entries(data.snippets))
+        result.push({ path: prefix + `snippets-${shard}.json`, data: JSON.stringify(snippets) });
+    return result;
+}
+
+// Build search data for the selected provider and optional local fallback
 hexo.extend.generator.register('theme_search', async function (locals) {
-    const config = this.theme.config.search || {};
-    if (config.enabled === false)
-        return;
-
-    if (!providers.includes(config.service)) {
-        const docs = gatherData(this, locals);
-        this.log.info('[local_search] Generated ' + docs.length + ' docs for local index.');
-        return {
-            path: 'search/index.json',
-            data: JSON.stringify({ docs }, null, 2)
-        };
-    }
+    const cfg = this.theme.config.search || {};
+    if (cfg.enabled === false) return [];
+    providers.resolve(cfg);
+    const docs = this.fluxDocs || (await content.gather(this, locals)),
+        data = build(this, docs);
+    this.fluxSearch = data;
+    this.fluxSearchDocs = docs;
+    this.fluxSearchMode = cfg.service || 'local';
+    return routes(
+        data,
+        'search/',
+        !providers.NATIVE.includes(cfg.service) &&
+            (cfg.local_fallback !== false || !providers.REMOTE.includes(cfg.service)),
+        topicUrls(this, locals, docs)
+    );
 });
 
-// Upload index to remote providers after generation
-hexo.extend.filter.register('after_generate', async function () {
-    if (hexo.env.cmd !== 'generate' && hexo.env.cmd !== 'g')
-        return;
+hexo.extend.helper.register('flux_search_mode', function () {
+    return hexo.fluxSearchMode || this.theme.search?.service || 'local';
+});
 
-    const ctx = this,
-        config = ctx.theme.config.search || {};
+// Expose the selected provider configuration with read credentials only
+hexo.extend.helper.register('flux_search_config', function () {
+    return providers.frontend(this.theme.search || {}, hexo.fluxSearchMode);
+});
 
-    if (!config.enabled)
-        return;
+// Keep playground sample searches separate from published site content
+hexo.extend.generator.register('flux_playground_search', function () {
+    if (!this.theme.config.playground?.enabled) return [];
+    const docs = require('../lib/playground-content.json').map((item) =>
+        content.normalize(
+            this,
+            { ...item, path: 'playground/#' + item.slug, content: item.project_summary },
+            'project'
+        )
+    );
+    return routes(build(this, docs), 'playground/search/', true);
+});
 
-    const service = config.service;
-    if (!providers.includes(service))
-        return;
-
-    const ups = config.upstash || {},
-        sb = config.supabase || {};
-
-    // Validate credentials
-    if (service === 'upstash' && (!ups.url || !ups.token))
-        return ctx.log.warn('[upstash] Missing credentials.');
-    if (service === 'supabase' && (!sb.url || !sb.sec_key))
-        return ctx.log.warn('[supabase] Missing credentials.');
-
-    ctx.log.info(`[${service}_search] Gathering data...`);
-
-    // Gather data
-    const docs = gatherData(ctx, hexo.locals.toObject());
-    if (!docs.length)
-        return;
-
-    // Prepare data structures
-    const wordMap = new Map(),
-        docMap = new Map(),
-        docList = [];
-
-    // Process documents
-    docs.forEach(doc => {
-        // Minify document for storage
-        const minDoc = {
-            id: doc.id,
-            title: doc.title,
-            url: doc.url,
-            date: doc.date,
-            type: doc.type,
-            excerpt: doc.excerpt,
-            encrypted: doc.encrypted
-        };
-        docMap.set(doc.id, JSON.stringify(minDoc));
-        docList.push(minDoc);
-
-        // Index unique tokens
-        const uniqueWords = new Set([
-            ...tokenize(doc.content),
-            ...tokenize(doc.title),
-            ...tokenize(doc.tags.join(' '))
+// Bound provider requests and report actionable errors without exposing credentials
+async function request(url, options, timeout) {
+    let res;
+    try {
+        res = await fetch(url, { ...options, signal: AbortSignal.timeout(timeout) });
+    } catch (error) {
+        const code = error.cause?.code || error.code;
+        let message = 'Network request failed. Check the provider URL and network connectivity.';
+        if (['ENOTFOUND', 'EAI_AGAIN'].includes(code))
+            message = `DNS lookup failed (${code}). Check the provider URL and DNS/network settings.`;
+        else if (
+            ['TimeoutError', 'AbortError'].includes(error.name) ||
+            ['ETIMEDOUT', 'UND_ERR_CONNECT_TIMEOUT'].includes(code)
+        )
+            message = `Search upload timed out after ${timeout} ms.`;
+        else if (code === 'ECONNREFUSED')
+            message = 'Connection refused. Check the provider URL and service availability.';
+        throw new Error(message, { cause: error });
+    }
+    if (!res.ok) {
+        const detail = errors.detail(await res.json().catch(() => null), [
+            options.headers?.Authorization?.replace(/^Bearer\s+/i, ''),
+            options.headers?.apikey,
         ]);
-
-        // Add to index
-        uniqueWords.forEach(word => {
-            if (!wordMap.has(word))
-                wordMap.set(word, new Set());
-
-            // Add doc ID
-            wordMap.get(word).add(doc.id);
-
-            // Fuzzy match support, split complex tokens
-            if (/[\.\-]/.test(word))
-                word.split(/[\.\-]/).filter(p => p.length > 1).forEach(p => {
-                    if (!wordMap.has(p))
-                        wordMap.set(p, new Set());
-                    wordMap.get(p).add(doc.id);
-                });
-        });
-    });
-
-    // Upload to Upstash
-    switch (String(service).toLowerCase()) {
-        case 'upstash':
-            const prefix = ups.index || 'flux',
-                pipeline = [["DEL", `${prefix}:docs`], ["DEL", `${prefix}:index`]];
-            try {
-                // Create new docs hash set
-                let dArgs = ["HSET", `${prefix}:docs`];
-                docMap.forEach((val, key) => {
-                    dArgs.push(key, val);
-                    if (dArgs.length > 500) {
-                        pipeline.push(dArgs);
-                        dArgs = ["HSET", `${prefix}:docs`];
-                    }
-                });
-
-                if (dArgs.length > 2)
-                    pipeline.push(dArgs);
-
-                // Create new index hash set
-                let iArgs = ["HSET", `${prefix}:index`];
-                wordMap.forEach((ids, word) => {
-                    iArgs.push(word, Array.from(ids).join(','));
-                    if (iArgs.length > 500) {
-                        pipeline.push(iArgs);
-                        iArgs = ["HSET", `${prefix}:index`];
-                    }
-                });
-
-                // Push last batch
-                if (iArgs.length > 2)
-                    pipeline.push(iArgs);
-
-                // Upload docs to Upstash
-                ctx.log.info(`[upstash] Uploading index (${docs.length} docs, ${wordMap.size} keywords)...`);
-                for (let i = 0; i < pipeline.length; i += 100)
-                    await upstashRequest(ups.url, ups.token, pipeline.slice(i, i + 100)).catch(e => ctx.log.error(e.message));
-            } catch (e) {
-                ctx.log.error(`[upstash] Error: ${e.message}`);
-            }
-            break;
-
-        // Upload to Supabase
-        case 'supabase':
-            const tDocs = (sb.table || 'flux_search') + '_docs',
-                tIndex = (sb.table || 'flux_search') + '_index',
-                safeDocList = docList.filter(doc => doc.id !== SUPABASE_PLACEHOLDER_ID),
-                indexList = Array.from(wordMap)
-                    .filter(([w]) => w !== SUPABASE_PLACEHOLDER_WORD)
-                    .map(([w, ids]) => ({ word: w, doc_ids: Array.from(ids) }));
-            try {
-                ctx.log.info(`[supabase] Clearing old data...`);
-
-                // Clear old data
-                await supabaseRequest(sb.url, sb.sec_key, `${tDocs}?id=neq.${SUPABASE_PLACEHOLDER_ID}`, 'DELETE');
-                await supabaseRequest(sb.url, sb.sec_key, `${tIndex}?word=neq.${SUPABASE_PLACEHOLDER_WORD}`, 'DELETE');
-
-                ctx.log.info(`[supabase] Uploading ${safeDocList.length} docs & ${indexList.length} keywords...`);
-
-                // Upload docs to Supabase
-                for (let i = 0; i < safeDocList.length; i += 100)
-                    await supabaseRequest(sb.url, sb.sec_key, tDocs, 'POST', safeDocList.slice(i, i + 100));
-
-                // Upload index to Supabase
-                for (let i = 0; i < indexList.length; i += 500)
-                    await supabaseRequest(sb.url, sb.sec_key, tIndex, 'POST', indexList.slice(i, i + 500));
-            } catch (e) {
-                ctx.log.error(`[supabase] Error: ${e.message}`);
-            }
-            break;
+        throw new Error(
+            `Search upload failed (HTTP ${res.status}). ` +
+                (detail
+                    ? detail
+                    : [401, 403].includes(res.status)
+                      ? 'Check the build credentials and database permissions.'
+                      : 'Check the provider URL, database tables, and service availability.')
+        );
     }
+    return res;
+}
 
-    ctx.log.info(`[${service}_search] Index updated successfully.`);
+// Synchronize changed remote indexes and retain retries after partial failures
+hexo.extend.filter.register('after_generate', async function () {
+    if (!['generate', 'g'].includes(this.env.cmd)) return;
+    const cfg = this.theme.config.search || {},
+        mode = cfg.service;
+    if (cfg.enabled === false || !providers.REMOTE.includes(mode)) return;
+    const data = this.fluxSearch;
+    if (!data) return;
+    const configuredTimeout = Number(cfg.upload?.timeout_ms),
+        timeout =
+            Number.isInteger(configuredTimeout) && configuredTimeout > 0
+                ? Math.min(configuredTimeout, 2147483647)
+                : 15000,
+        native = providers.NATIVE.includes(mode),
+        config = providers.resolve(cfg),
+        prepared = native ? providers.prepare(mode, this.fluxSearchDocs) : null,
+        identity = cache.hash([mode, config || cfg[mode]]),
+        digest = prepared?.digest || cache.hash(data),
+        pending = native && cache.get(this, 'remote', identity + ':pending');
+    // Skip uploads only when a matching index finished syncing successfully
+    if (!pending && cache.get(this, 'remote', identity)?.digest === digest) {
+        this.log.info('[search] unchanged remote index; upload skipped');
+        return;
+    }
+    const docs = data.catalog.map(({ snippet, tags, categories, day, ...doc }) => ({
+        ...doc,
+        excerpt: data.snippets[snippet][doc.id],
+    }));
+    try {
+        // Mark unfinished replacements before changing remote index data
+        if (native) {
+            // Retry partial syncs even when content reverts to the last successful digest
+            cache.set(this, 'remote', identity + ':pending', { digest });
+            await providers.sync(mode, config, prepared, request, timeout);
+        } else if (mode === 'upstash') {
+            cache.remove(this, 'remote', identity);
+            const u = config || {},
+                prefix = u.index || 'flux';
+            if (!u.url || !u.token) throw new Error('Missing Upstash build credentials');
+            const commands = [
+                ['DEL', prefix + ':docs'],
+                ['DEL', prefix + ':index'],
+            ];
+
+            for (let i = 0; i < docs.length; i += 100)
+                commands.push([
+                    'HSET',
+                    prefix + ':docs',
+                    ...docs.slice(i, i + 100).flatMap((d) => [d.id, JSON.stringify(d)]),
+                ]);
+            const words = Object.entries(data.index);
+
+            for (let i = 0; i < words.length; i += 100)
+                commands.push([
+                    'HSET',
+                    prefix + ':index',
+                    ...words.slice(i, i + 100).flatMap(([w, ids]) => [w, ids.join(',')]),
+                ]);
+            for (let i = 0; i < commands.length; i += 100) {
+                const rows = await (
+                    await request(
+                        u.url.replace(/\/$/, '') + '/pipeline',
+                        {
+                            method: 'POST',
+                            headers: {
+                                Authorization: `Bearer ${u.token}`,
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(commands.slice(i, i + 100)),
+                        },
+                        timeout
+                    )
+                ).json();
+                if (rows.some((row) => row.error))
+                    throw new Error('Upstash rejected an index command');
+            }
+        } else {
+            cache.remove(this, 'remote', identity);
+            const s = config || {},
+                table = s.table || 'flux_search';
+            if (!s.url || !s.sec_key) throw new Error('Missing Supabase build credentials');
+            const send = (endpoint, method, body) =>
+                request(
+                    s.url.replace(/\/$/, '') + '/rest/v1/' + endpoint,
+                    {
+                        method,
+                        headers: {
+                            ...providers.supabaseHeaders(s.sec_key),
+                            'Content-Type': 'application/json',
+                            Prefer: 'return=minimal',
+                        },
+                        body: body ? JSON.stringify(body) : undefined,
+                    },
+                    timeout
+                );
+            await send(table + '_docs?id=neq.placeholder', 'DELETE');
+            await send(table + '_index?word=neq.placeholder', 'DELETE');
+            for (let i = 0; i < docs.length; i += 100)
+                await send(table + '_docs', 'POST', docs.slice(i, i + 100));
+            const rows = Object.entries(data.index)
+                .filter(([w]) => w !== 'placeholder')
+                .map(([word, doc_ids]) => ({ word, doc_ids }));
+
+            for (let i = 0; i < rows.length; i += 500)
+                await send(table + '_index', 'POST', rows.slice(i, i + 500));
+        }
+        cache.set(this, 'remote', identity, { digest });
+        if (native) cache.remove(this, 'remote', identity + ':pending');
+        this.log.info('[search] remote index uploaded');
+    } catch (error) {
+        const provider =
+            mode === 'turso'
+                ? 'Turso'
+                : mode === 'upstash_search'
+                  ? 'Upstash Search'
+                  : mode === 'supabase'
+                    ? 'Supabase'
+                    : 'Upstash';
+        if (native || cfg.upload?.fail_on_error === true) {
+            this.log.error(
+                '[search] %s upload failed: %s Next generation will retry.',
+                provider,
+                error.message
+            );
+            throw error;
+        }
+        if (cfg.local_fallback !== false) this.fluxSearchMode = 'local';
+        this.log.warn(
+            '[search] %s upload failed: %s %s Next generation will retry.',
+            provider,
+            error.message,
+            cfg.local_fallback !== false
+                ? 'Using local search for this build.'
+                : 'Remote search may be outdated or unavailable.'
+        );
+    }
 });
 
-// Search page structure
+// Generate the search page only when search is enabled
 hexo.extend.generator.register('theme_search_page', function () {
-    const config = this.theme.config.search || {};
-    if (config.enabled === false)
-        return;
+    if (this.theme.config.search?.enabled === false) return [];
     return {
         path: 'search/index.html',
         layout: 'search',
-        data: { title: config.title || 'Search' }
+        data: { title: this.theme.config.search?.title || 'Search', flux_search: true },
     };
 });
