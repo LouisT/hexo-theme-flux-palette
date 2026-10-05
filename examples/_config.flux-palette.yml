@@ -1,0 +1,181 @@
+# Copy this example to _config.flux-palette.yml in the Hexo site root.
+# Hexo merges these settings over the theme defaults without a theme_config: wrapper.
+# Keep general Hexo settings in _config.yml and credentials in .env or the shell/CI environment.
+
+menu: # Header navigation labels and destinations.
+  Home: / # Site homepage.
+  Blog: /blog/ # Chronological post listing.
+  Projects: /projects/ # Project portfolio listing.
+  Misc: # Dropdown containing the links below.
+    Archives: /archives/ # Posts grouped by year.
+    Cloud: /cloud/ # Category and tag cloud.
+    Search: /search/ # Site search page.
+
+sidebar: # Sidebar sections and appearance.
+  recent_projects: # Recent project links.
+    enabled: true # Show the recent-projects section.
+    limit: 5 # Maximum number of recent projects to display.
+  social_buttons: # Buttons using the social links in _config.yml.
+    enabled: true # Show social buttons in the sidebar.
+    size: 1.6em # CSS font size for the social icons.
+  palette_selector: # Reader controls for selecting a color palette.
+    enabled: true # Show the palette selector.
+    default_dark: solar-amber # Initial palette for a dark color-scheme preference.
+    default_light: paper-and-ink # Initial palette for a light color-scheme preference.
+    # include: [solar-amber, paper-and-ink] # Optional subset; include both defaults.
+
+blog: # Settings for the /blog/ post listing.
+  title: Blog # Blog page title.
+  per_page: 10 # Optional override of index_generator.per_page in _config.yml.
+
+projects: # Settings for project listings.
+  title: Projects # Projects page title.
+  per_page: 10 # Projects per page; 0 displays all projects on one page.
+  filters: # Browser controls for filtering the project listing.
+    enabled: true # Show project filters.
+
+archive: # Settings for the /archives/ listing.
+  years_per_page: 4 # Number of year groups displayed on each archive page.
+
+search: # Search page, provider, and build-time indexing settings.
+  enabled: true # Generate search pages and search data.
+  title: Search # Search page title.
+  service: local # local, supabase, turso, upstash, upstash_search; local needs no credentials.
+  debounce: 3000 # Wait three seconds after typing before querying the search provider.
+  local_fallback: true # Applies to Redis/Supabase; native providers require successful indexing.
+  upload: # Build-time remote indexing request settings.
+    timeout_ms: 15000 # Maximum duration of each remote upload request, in milliseconds.
+    fail_on_error: false # Set true to require successful Redis/Supabase indexing.
+  # Only the selected provider's env references are required.
+  supabase: # Supabase database search provider.
+    url: env:SUPABASE_URL # Project URL, resolved from the named environment variable.
+    sec_key: env:SUPABASE_SECRET_KEY # Build-only key used to upload the search index.
+    pub_key: env:SUPABASE_PUBLISHABLE_KEY # Public browser key used to read search results.
+    table: flux_search # Supabase table containing searchable documents.
+  turso: # Turso database and FTS5 search provider.
+    url: env:TURSO_DATABASE_URL # Database URL, resolved from the named environment variable.
+    token: env:TURSO_AUTH_TOKEN # Build-only write token.
+    read_token: env:TURSO_READ_ONLY_TOKEN # Separate public read-only token.
+    table: flux_search # Prefix for the theme's document and FTS5 tables.
+  upstash: # Upstash Redis search provider.
+    url: env:UPSTASH_REDIS_REST_URL # Redis REST endpoint, separate from Upstash Search.
+    token: env:UPSTASH_REDIS_REST_TOKEN # Build-only write token for Redis indexing.
+    read_token: env:UPSTASH_REDIS_READ_ONLY_TOKEN # Public read-only token for browser queries.
+    index: flux # Prefix for search keys stored in Redis.
+  upstash_search: # Upstash Search provider with keyword and semantic matching.
+    url: env:UPSTASH_SEARCH_REST_URL # Search REST endpoint, separate from Upstash Redis.
+    token: env:UPSTASH_SEARCH_REST_TOKEN # Build-only write token for Search indexing.
+    read_token: env:UPSTASH_SEARCH_READ_ONLY_TOKEN # Public read-only token for browser queries.
+    index: flux # Upstash Search index name.
+    max_results: 100 # Candidate chunks; multiple chunks can belong to one article.
+    semantic_weight: 0.75 # Weight of semantic matching, from 0 to 1.
+    reranking: false # Let Upstash rerank search results for relevance.
+    input_enrichment: false # Let Upstash enrich the search query before matching.
+
+# Enable comments after supplying your own repository and provider settings.
+comments: # GitHub-backed comment widgets.
+  enabled: false # Enable after configuring your own comment repository.
+  service: giscus # Comment provider: giscus or utterances.
+  sync_theme: true # Match the comment widget to the selected light or dark palette.
+  giscus: # GitHub Discussions settings from the giscus setup page.
+    repo: "your-name/your-repo" # Repository in owner/name format.
+    repo_id: "" # Repository ID provided by giscus.
+    category: "General" # Discussion category used for comments.
+    category_id: "" # ID of the selected discussion category.
+    mapping: pathname # Match each page to a discussion by its URL pathname.
+    lang: en # Language code for the comment interface.
+  utterances: # GitHub Issues settings, used when service is utterances.
+    repo: "your-name/your-repo" # Repository in owner/name format.
+    issue_term: pathname # Match each page to an issue by its URL pathname.
+    label: comments # Label applied to comment issues.
+
+assets: # Optimization and caching of generated theme assets.
+  minify_css: true # Minify generated stylesheets.
+  fingerprint: true # Add content hashes to asset filenames for cache invalidation.
+  cache_headers: true # Write immutable cache rules for hashed assets to _headers.
+
+swc: # JavaScript compilation settings.
+  enabled: true # Compile theme JavaScript with SWC when available.
+  target: es2020 # JavaScript language level for compiled output.
+  minify: true # Minify compiled JavaScript.
+
+build_cache: # Cache reusable theme work between builds.
+  enabled: true # Reuse cached results when content and settings have not changed.
+# build: # Optional limits for shared build work.
+#   concurrency: 4 # Optional 1-8; otherwise the theme chooses automatically.
+
+images: # Responsive variants for supported local images.
+  enabled: true # Generate image variants and responsive image markup.
+  widths: [320, 640, 960, 1280] # Candidate widths in pixels; images are never enlarged.
+  quality: 80 # Encoding quality for generated variants, from 1 to 100.
+
+reading: # Browser-local reading tools and saved articles.
+  enabled: true # Show bookmark controls and generate the reading-list page.
+read_time: # Estimated article reading time.
+  enabled: true # Calculate and display reading-time estimates.
+  write_front_matter: false # Persist reading-time metadata into source files when true.
+related_content: # Related articles and projects shown after an article.
+  enabled: true # Show related-content suggestions.
+  limit: 4 # Maximum number of related items to display.
+heading_links: # Direct links to individual article headings.
+  enabled: true # Show controls for copying heading links.
+link_previews: # Preview tooltips for internal article links.
+  enabled: true # Show internal-link previews.
+embeds: # External media embeds authored with supported theme tags.
+  enabled: true # Require a reader click before loading an external embed.
+print: # Print-specific article presentation.
+  enabled: true # Load the stylesheet for cleaner printed articles.
+backtotop: # Floating button for returning to the top of a page.
+  enabled: true # Show the back-to-top button.
+
+offline: # Explicit article downloads stored locally in the reader's browser.
+  enabled: false # Enable offline article downloads.
+  max_articles: 50 # Maximum number of downloaded articles to retain.
+  max_bytes: 52428800 # 50 MiB of browser-local article downloads.
+
+content_freshness: # Updated dates and optional warnings for older content.
+  enabled: true # Show explicit updated dates and allow stale-content notices.
+  stale_notice: # Optional warning based on the article's latest date.
+    enabled: false # Show a notice when an article is older than the threshold.
+    after_days: 365 # Age in days after which an article is considered stale.
+
+feeds: # RSS, Atom, and sitemap generation.
+  enabled: true # Enable feed and sitemap generation.
+  limit: 20 # Maximum posts in RSS and Atom; 0 includes all eligible posts.
+  summary_length: 300 # Maximum plain-text summary length in characters.
+  include_drafts: false # Include draft entries when Hexo supplies them.
+  include_future: false # Include entries dated in the future.
+  rss: # RSS feed settings.
+    enabled: true # Generate the RSS feed at the inherited rss.xml path.
+  atom: # Atom feed settings.
+    enabled: true # Generate the Atom feed at the inherited atom.xml path.
+  sitemap: # XML sitemap settings.
+    enabled: true # Generate the sitemap at the inherited sitemap.xml path.
+
+short_url: # Short redirect URLs for posts and projects.
+  enabled: true # Generate short URLs.
+  length: 6 # Number of characters in each short URL hash.
+cloud: # Category and tag cloud page.
+  enabled: true # Generate the cloud page.
+  title: Cloud # Cloud page title.
+  sort_by: count # Sort topics by count or name.
+  sort_order: desc # Sort descending (desc) or ascending (asc).
+
+playground: # Optional page demonstrating the theme with bundled sample content.
+  enabled: false # Enable the theme's sample-content playground when needed.
+
+# Optional site artwork, relative to the site's public root:
+# favicon: /images/favicon.ico # Custom browser-tab icon; otherwise the theme generates one.
+# default_og_image: /images/social-card.png # Default social-sharing image for pages without their own.
+
+home: # Homepage layout and featured content.
+  mode: blog # Main homepage listing: blog or projects.
+  curated: # Pinned posts, featured projects, and topic links above the main listing.
+    enabled: true # Show the curated homepage sections.
+    pinned_limit: 3 # Pinned articles visible at once on desktop; additional articles scroll.
+    projects_limit: 3 # Featured projects visible at once on desktop; additional projects scroll.
+    topics: [] # Optional links, such as [{label: Projects, url: /projects/}].
+
+series: # Article series pages and chapter navigation.
+  enabled: true # Generate series pages and previous/next chapter links.
+  items: {} # Optional metadata keyed by the series ID used in post front matter.

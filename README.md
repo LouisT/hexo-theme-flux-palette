@@ -52,14 +52,15 @@ highlight:
   hljs: false # Required for the theme's code styles.
 ```
 
-Create `_config.flux-palette.yml` beside it for theme preferences:
+Copy the bundled [configuration example](examples/_config.flux-palette.yml) into your Hexo site root, beside the main `_config.yml`:
 
-```yml
-search:
-  service: local
+```bash
+cp -n themes/flux-palette/examples/_config.flux-palette.yml _config.flux-palette.yml
 ```
 
-Hexo merges this file over the [shipped defaults](_config.yml). Add only your overrides, without a `theme_config:` wrapper. Existing `theme_config` values take priority, so remove duplicates when migrating. Keep general Hexo settings and social links in the main site config.
+The example uses local search without credentials and leaves comments disabled until you configure your own repository. `cp -n` preserves an existing file; merge the example settings into your existing config when needed.
+
+Hexo merges the site-root copy over the [shipped defaults](_config.yml). Add your preferences without a `theme_config:` wrapper. Existing `theme_config` values take priority, so remove duplicates when migrating. Keep general Hexo settings and social links in the main site config. Files under `themes/flux-palette/examples/` are templates; edit the copies in your site root to configure the site.
 
 ```bash
 npx hexo generate
@@ -70,7 +71,27 @@ For production installs, add `--omit=dev` to the theme's `npm ci` command. Set `
 
 ## Configuration
 
-Unless labeled otherwise, configuration examples belong in the site's `_config.flux-palette.yml`. See the [defaults](_config.yml) for the full option list.
+Unless labeled otherwise, configuration examples belong in the site's `_config.flux-palette.yml`. The [annotated example](examples/_config.flux-palette.yml) provides a starting configuration and environment references for every search provider. See the [defaults](_config.yml) for the full option list.
+
+### Environment variables
+
+Local search needs no `.env` file. For remote search or passwords supplied through environment variables, copy the bundled [environment example](examples/.env.example) from the Hexo site root:
+
+```bash
+cp -n themes/flux-palette/examples/.env.example .env
+```
+
+Select `search.service` in the site-root `_config.flux-palette.yml`, then fill in only that provider's variables in `.env`; the matching `env:VARIABLE` references are already present in the configuration example. Leave unused credentials blank. For [password-protected content](#password-protection), set `FLUX_POST_PASSWORD` and use `password: env:FLUX_POST_PASSWORD` in the article's front matter, or supply another named variable.
+
+The theme automatically loads `.env` from the Hexo site root. Shell and CI variables take precedence. Restart Hexo after editing the file. `.env.example` contains placeholders; keep actual `.env` files out of Git. Add these entries to your site's `.gitignore`:
+
+```gitignore
+.env
+.env.*
+!.env.example
+```
+
+### Theme settings
 
 | Setting | Purpose |
 | --- | --- |
@@ -376,7 +397,7 @@ Curated sections appear only on the homepage. Its blog feed shares the first `/b
 
 Fresh installations use local search without credentials. All providers support posts/projects, tag/category filters, publication-date filters, and excerpts. `search.debounce` defaults to 3000 milliseconds.
 
-For a remote provider, use `env:VARIABLE` references as shown below. The theme automatically loads the site's root `.env`; shell/CI variables take precedence. Restart Hexo after editing it. Only the selected provider's variables are required. Write tokens stay in the build process; publishable keys and read-only tokens appear in the generated site. Use a database or index dedicated to public search data.
+For a remote provider, use `env:VARIABLE` references as shown below. The [configuration example](examples/_config.flux-palette.yml) and [environment example](examples/.env.example) include every provider's matching names; follow the [environment setup](#environment-variables) to create the site-root copies. Only the selected provider's variables are required. Write tokens stay in the build process; publishable keys and read-only tokens appear in the generated site. Use a database or index dedicated to public search data.
 
 ### Turso
 
@@ -530,6 +551,6 @@ The site checker validates links, fragments, and assets; pass your deployment su
 
 JavaScript follows `scripts/project-generator.js`: four-space indentation, single quotes, semicolons, and grouped declarations for related values. Use focused single-line `//` comments above functions and complex statements, explaining their purpose without ending punctuation.
 
-When updating, preserve the site's `_config.flux-palette.yml`, reinstall dependencies from the new lockfile, and regenerate. Move older custom settings out of the theme defaults or `theme_config` block first. If using the demo's `update-theme.sh`, follow its README for baseline checks and backups.
+When updating, preserve the site's `_config.flux-palette.yml` and `.env`, reinstall dependencies from the new lockfile, and regenerate. Compare updated templates in `examples/` with your site-root copies and merge any settings you need. Move older custom settings out of the theme defaults or `theme_config` block first. If using the demo's `update-theme.sh`, follow its README for baseline checks and backups.
 
 Flux Palette is [MIT licensed](LICENSE), by LouisT. Footer credit is controlled by `attribution`; its default link is [louist.dev/projects/flux-palette](https://louist.dev/projects/flux-palette/).
